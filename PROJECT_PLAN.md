@@ -20,7 +20,7 @@ framework automates.
 questions about Malaysian banking regulation and gets a grounded, cited
 answer, instead of manually searching BNM policy PDFs.
 
-**Corpus (in `/backend/data/raw_pdfs/`):**
+**Corpus (in `app/data/raw_pdfs/`):**
 - `ekyc_policy.pdf` — BNM e-KYC Policy (2024, 30p)
 - `fair_treatment_policy.pdf` — BNM Fair Treatment of Financial Consumers (2024, 54p)
 - `aml_cft_fi_policy.pdf` — BNM AML/CFT/CPF/TFS Policy for Financial Institutions (181p)
@@ -32,54 +32,60 @@ embeddings + generation, Cohere free tier for reranking. No live
 deployment — GitHub repo + Docker Compose + demo video is the
 deliverable.
 
+**Note on layout:** the repo is flat at the root (no `/backend` wrapper
+folder) — since the frontend is just static files served by FastAPI
+rather than a separate app, there's no need for a top-level backend/
+frontend split. `app/` sits directly at the repo root.
+
 ---
 
 ## Repo structure (target — build incrementally per phase)
 ```
-/backend
-  app/
-    main.py                    # FastAPI app factory, mounts routers, static files
-    core/
-      config.py                 # pydantic-settings: env vars, model IDs, DB URL
-      logging.py                 # logger setup, request-id middleware, timing helper
-      db.py                       # Postgres/SQLAlchemy session management
-      retry.py                     # tenacity-based retry wrapper for external API calls
-    api/
-      routes/
-        chat.py                   # POST /chat
-        sessions.py                # GET /sessions, GET /sessions/{id}
-        health.py                   # GET /health
-    schemas/
-      chat.py                     # Pydantic request/response models (incl. structured
-                                    # Gemini output schema: answer, sources, grounded)
-    services/
-      ingestion_service.py         # PDF -> chunks -> embeddings -> pgvector (Phase 1)
-      retrieval_service.py          # vector search + full-text search + RRF fusion
-      rerank_service.py              # Cohere rerank wrapper
-      generation_service.py           # Gemini call w/ structured output
-      chat_service.py                  # orchestrates retrieve->rerank->generate,
-                                         # persists messages, builds prompt w/ history
-    db/
-      models.py                    # SQLAlchemy models: Chunk, ChatSession, Message
-      vector_repository.py          # pgvector similarity + full-text queries
-      chat_repository.py             # session/message CRUD
-    static/                       # plain HTML/CSS/JS frontend
-      index.html
-      style.css
-      chat.js
-  scripts/
-    ingest_documents.py            # one-off script to populate pgvector from PDFs
-  evals/
-    questions.json                 # hand-written eval question set (Phase 2)
-    results/                       # RAGAS run outputs, one file per pipeline config
-  tests/                          # optional but good practice, add as you go
-  requirements.txt
-  docker-compose.yml               # postgres (with pgvector image) + backend
-  Dockerfile
-  .env.example                     # GEMINI_API_KEY=, COHERE_API_KEY=, DATABASE_URL=, ...
+app/
+  main.py                    # FastAPI app factory, mounts routers, static files
+  core/
+    config.py                 # pydantic-settings: env vars, model IDs, DB URL
+    logging.py                 # logger setup, request-id middleware, timing helper
+    db.py                       # Postgres/SQLAlchemy session management
+    retry.py                     # tenacity-based retry wrapper for external API calls
+  api/
+    routes/
+      chat.py                   # POST /chat
+      sessions.py                # GET /sessions, GET /sessions/{id}
+      health.py                   # GET /health
+  schemas/
+    chat.py                     # Pydantic request/response models (incl. structured
+                                  # Gemini output schema: answer, sources, grounded)
+  services/
+    ingestion_service.py         # PDF -> chunks -> embeddings -> pgvector (Phase 1)
+    retrieval_service.py          # vector search + full-text search + RRF fusion
+    rerank_service.py              # Cohere rerank wrapper
+    generation_service.py           # Gemini call w/ structured output
+    chat_service.py                  # orchestrates retrieve->rerank->generate,
+                                       # persists messages, builds prompt w/ history
+  db/
+    models.py                    # SQLAlchemy models: Chunk, ChatSession, Message
+    vector_repository.py          # pgvector similarity + full-text queries
+    chat_repository.py             # session/message CRUD
+  static/                       # plain HTML/CSS/JS frontend
+    index.html
+    style.css
+    chat.js
+  data/
+    raw_pdfs/                    # the 3 source PDFs go here
+scripts/
+  ingest_documents.py            # one-off script to populate pgvector from PDFs
+evals/
+  questions.json                 # hand-written eval question set (Phase 2)
+  results/                       # RAGAS run outputs, one file per pipeline config
+tests/                          # optional but good practice, add as you go
 docs/
   architecture.md                  # simple diagram + explanation (Phase 8)
   demo.gif
+requirements.txt
+docker-compose.yml               # postgres (with pgvector image) + app
+Dockerfile
+.env.example                     # GEMINI_API_KEY=, COHERE_API_KEY=, DATABASE_URL=, ...
 README.md
 PROJECT_PLAN.md
 PROGRESS.md
@@ -151,6 +157,10 @@ validated against a Pydantic schema, not parsed from free text):
 - Generation model: Gemini's current flash-tier model, same rule — verify,
   don't assume
 - Structured output: Gemini JSON mode constrained to the response schema above
+- **Database driver: `psycopg` (v3), not `psycopg2-binary`** — SQLAlchemy's
+  default Postgres dialect expects `psycopg` v3, and it has more reliable
+  prebuilt wheels on Windows anyway. `DATABASE_URL` must use the
+  `postgresql+psycopg://` prefix, not plain `postgresql://`.
 - **LLM calls use the `openai` Python SDK pointed at Gemini's OpenAI-compatible
   endpoint** (`base_url="https://generativelanguage.googleapis.com/v1beta/openai/"`,
   `api_key=<GEMINI_API_KEY>`), not the native `google-generativeai` SDK. This
