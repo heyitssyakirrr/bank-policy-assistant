@@ -21,7 +21,7 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from app.ingestion.manifest import DocumentSpec
 from app.ingestion.models import AnnotatedBlock, Chunk, ChunkType, ParsedDocument, Role
@@ -37,10 +37,11 @@ REFERENCE_WORDS = frozenset(
 
 
 def references_footnote(text: str, number: str) -> bool:
-    """True if `text` contains footnote marker `number`: a word or closing
-    bracket, a space, then the number ("issued ID 3 by", "masks 4 )").
-    Docling separates superscripts from the word with a space."""
-    pattern = re.compile(rf"(?P<word>[A-Za-z]+|[)\]’'\"])\s+{number}(?=[\s.,;:)]|$)")
+    """True if `text` contains footnote marker `number`: a word, a paragraph
+    number or a closing bracket, a space, then the number ("issued ID 3 by",
+    "masks 4 )", "paragraph 8.22 11 ."). Docling separates superscripts from
+    the word before them with a space."""
+    pattern = re.compile(rf"(?P<word>[A-Za-z]+|\d+[A-Z]?(?:\.\d+)+|[)\]’'\"])\s+{number}(?=[\s.,;:)]|$)")
     for match in pattern.finditer(text):
         if match.group("word").lower() not in REFERENCE_WORDS:
             return True
@@ -95,11 +96,24 @@ def _render_table(rows: list[tuple[str, ...]], caption: str, lead_in: str = "") 
     return "\n".join(lines)
 
 
-def _group_into_units(annotated: list[AnnotatedBlock]) -> tuple[list[_Unit], list[AnnotatedBlock]]:
+def _group_into_units(
+    annotated: list[AnnotatedBlock],
+) -> tuple[list[_Unit], list[AnnotatedBlock], list[tuple[AnnotatedBlock, _Unit]]]:
+    """Returns (units, footnotes, heading_owners). heading_owners maps each
+    heading to the first unit under it, so a footnote marker sitting on a
+    heading ("C. IDV through e-KYC for legal person 5") has somewhere to go."""
     units: list[_Unit] = []
     footnotes: list[AnnotatedBlock] = []
+    heading_owners: list[tuple[AnnotatedBlock, _Unit]] = []
+    pending_headings: list[AnnotatedBlock] = []
     open_text: _Unit | None = None  # the paragraph / text unit that continuations attach to
     last_content: _Unit | None = None  # last unit that received content (for table stitching)
+
+    def add(unit: _Unit) -> _Unit:
+        units.append(unit)
+        heading_owners.extend((heading, unit) for heading in pending_headings)
+        pending_headings.clear()
+        return unit
 
     for ab in annotated:
         role = ab.role
@@ -107,6 +121,7 @@ def _group_into_units(annotated: list[AnnotatedBlock]) -> tuple[list[_Unit], lis
             if role is not Role.SKIP:
                 open_text = None  # headings and callout titles close the open paragraph/text
                 last_content = None
+                pending_headings.append(ab)
             continue
         if role is Role.FOOTNOTE:
             footnotes.append(ab)
@@ -139,57 +154,87 @@ def _group_into_units(annotated: list[AnnotatedBlock]) -> tuple[list[_Unit], lis
                 prev.table_rows.extend(rows)
                 prev.blocks.append(ab)
                 continue
-            unit = _Unit(ChunkType.TABLE, first=ab, blocks=[ab], table_rows=rows, caption=ab.block.caption)
+            unit = add(_Unit(ChunkType.TABLE, first=ab, blocks=[ab], table_rows=rows, caption=ab.block.caption))
             if open_text is not None and open_text.chunk_type is ChunkType.PARAGRAPH:
                 # "10. ... shall adopt a tiered approach ... as follows:" + Table 1.
                 # Without the lead-in the table chunk doesn't say what it is for.
                 unit.lead_in = _truncate_words(open_text.text, LEAD_IN_WORDS)
-            units.append(unit)
             last_content = unit
             # The paragraph stays open: text after a table usually still belongs to it.
             continue
 
         if role is Role.PARAGRAPH_START:
-            open_text = _Unit(ChunkType.PARAGRAPH, first=ab, blocks=[ab])
-            units.append(open_text)
+            open_text = add(_Unit(ChunkType.PARAGRAPH, first=ab, blocks=[ab]))
             last_content = open_text
             continue
 
         # CONTINUATION
         if open_text is None:
-            open_text = _Unit(ChunkType.TEXT, first=ab, blocks=[])
-            units.append(open_text)
+            open_text = add(_Unit(ChunkType.TEXT, first=ab, blocks=[]))
         open_text.blocks.append(ab)
         last_content = open_text
 
-    return units, footnotes
+    return units, footnotes, heading_owners
 
 
-def _attach_footnotes(units: list[_Unit], footnotes: list[AnnotatedBlock]) -> list[AnnotatedBlock]:
+@dataclass(slots=True)
+class _Footnote:
+    number: str | None
+    text: str
+    page: int
+    blocks: list[AnnotatedBlock]
+
+
+def _merge_footnote_parts(footnotes: list[AnnotatedBlock]) -> list[_Footnote]:
+    """A footnote can span several blocks: "11 This requirement must be
+    completed ... unless:" followed by "(i) ..." and "(ii) ...". A block that
+    doesn't start with a number continues the footnote before it."""
+    merged: list[_Footnote] = []
+    for ab in footnotes:
+        match = FOOTNOTE_NUMBER_RE.match(ab.block.text)
+        if match:
+            merged.append(_Footnote(match.group(1), match.group(2), ab.block.page, [ab]))
+        elif merged and merged[-1].page in (ab.block.page, ab.block.page - 1):
+            merged[-1].text += "\n" + ab.block.text
+            merged[-1].blocks.append(ab)
+        else:
+            merged.append(_Footnote(None, ab.block.text, ab.block.page, [ab]))
+    return merged
+
+
+def _attach_footnotes(
+    units: list[_Unit],
+    footnotes: list[AnnotatedBlock],
+    heading_owners: list[tuple[AnnotatedBlock, _Unit]],
+) -> list[AnnotatedBlock]:
     """Put each footnote on the unit that references it ("issued ID 3 by")
-    on the same page. Returns footnotes no unit referenced."""
+    on the same page. Returns the blocks of footnotes nothing referenced."""
     # page -> [(unit, text on that page)], so each footnote only checks its own page
     by_page: dict[int, list[tuple[_Unit, str]]] = {}
     for unit in units:
         for ab in unit.blocks:
             text = unit.text if unit.chunk_type is ChunkType.TABLE else ab.block.full_text
             by_page.setdefault(ab.block.page, []).append((unit, text))
+    for heading, unit in heading_owners:  # checked last: body text wins over a heading
+        by_page.setdefault(heading.block.page, []).append((unit, heading.block.full_text))
 
     unreferenced: list[AnnotatedBlock] = []
-    for fn in footnotes:
-        match = FOOTNOTE_NUMBER_RE.match(fn.block.text)
-        if not match:
-            unreferenced.append(fn)
-            continue
-        number = match.group(1)
-        owner = next(
-            (unit for unit, text in by_page.get(fn.block.page, []) if references_footnote(text, number)),
-            None,
-        )
+    for fn in _merge_footnote_parts(footnotes):
+        owner = None
+        if fn.number is not None:
+            owner = next(
+                (unit for unit, text in by_page.get(fn.page, []) if references_footnote(text, fn.number)),
+                None,
+            )
         if owner is None:
-            unreferenced.append(fn)
+            unreferenced.extend(fn.blocks[:1])  # report/keep it once, as its first block
+            if len(fn.blocks) > 1:  # keep the continuation text with it
+                first = fn.blocks[0]
+                unreferenced[-1] = replace(
+                    first, block=replace(first.block, text=f"{fn.number or ''} {fn.text}".strip())
+                )
         else:
-            owner.footnotes.append(f"[{number}] {match.group(2)}")
+            owner.footnotes.append(f"[{fn.number}] {fn.text}")
     return unreferenced
 
 
@@ -285,8 +330,8 @@ def build_chunks(
 ) -> tuple[list[Chunk], dict]:
     """Returns (chunks, stats). Stats feed the debug report."""
     config = config or ChunkingConfig()
-    units, footnotes = _group_into_units(annotated)
-    unreferenced = _attach_footnotes(units, footnotes)
+    units, footnotes, heading_owners = _group_into_units(annotated)
+    unreferenced = _attach_footnotes(units, footnotes, heading_owners)
     for fn in unreferenced:  # keep them searchable rather than silently losing content
         units.append(_Unit(ChunkType.FOOTNOTE, first=fn, blocks=[fn]))
 

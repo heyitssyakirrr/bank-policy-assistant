@@ -85,6 +85,7 @@ def report_lines(
     chunks: list[Chunk],
     stats: dict,
     coverage: list[PageCoverage] | None,
+    skip_pages: frozenset[int] = frozenset(),
 ) -> list[str]:
     roles = Counter(ab.role.value for ab in annotated)
     types = Counter(c.chunk_type.value for c in chunks)
@@ -112,7 +113,8 @@ def report_lines(
     if coverage is None:
         lines.append("coverage check: skipped (pymupdf not installed)")
     else:
-        flagged = [c for c in coverage if c.flagged]
+        # Pages the manifest skips (cover, contents) are excluded on purpose.
+        flagged = [c for c in coverage if c.flagged and c.page not in skip_pages]
         lines.append(f"coverage check: {len(flagged)} of {len(coverage)} pages flagged")
         lines += [
             f"    - p{c.page}: parser {c.parser_words} words vs raw text {c.reference_words} ({c.ratio:.0%})"

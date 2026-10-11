@@ -51,7 +51,7 @@ bank-policy-assistant/
       debug/                    *.1_blocks / *.2_structure / *.3_chunks .txt + report.txt (gitignored)
     static/          index.html, style.css, chat.js
   scripts/           test_embeddings.py
-  tests/             test_ingestion.py (23 tests, no models/PDFs needed)
+  tests/             test_ingestion.py (27 tests, no models/PDFs needed)
   requirements.txt (app) / requirements-ingest.txt (+docling, pymupdf, pyyaml) / requirements-dev.txt (+pytest, ruff)
   pyproject.toml     pytest + ruff config
   docker-compose.yml, Dockerfile (empty), docs/, evals/ (empty placeholders)
@@ -184,7 +184,18 @@ Notes:
   a lone "S"/"G" block is carried to the next paragraph number; AML's
   definitions glossary rows cut by a page break (empty first cell) are
   glued back onto their term; "APPENDICES" divider resets the path.
-- Verified: 23 unit tests built from real Docling dumps + PDF pages pass; full run
+- 2026-10-11 first REAL Docling run (e-KYC): 341 blocks -> 112 chunks,
+  all section headings correct (Parts A-C, sections 1-12, Appendices
+  1-6), para 8.10 and the stitched FAR table exactly right. Fixed from
+  that run: footnote marker after a paragraph number ("8.22 11 ."),
+  footnotes spanning several blocks (fn 11 + its (i)/(ii)), footnote on a
+  heading ("legal person 5" -> first chunk under it), Docling reading
+  Appendix 2 para 11 (a numbered list) as a table -> converted back to a
+  paragraph, coverage report ignores manifest-skipped pages. Replayed on
+  the real blocks: 108 chunks, 0 unmatched footnotes, 0 duplicates, all
+  57 main-body paragraphs present. Known, accepted: Docling scrambles
+  the order of App. 3 para 7(g)/(h) on p.24 (text kept, order off).
+- Verified: 27 unit tests built from real Docling dumps + PDF pages pass; full run
   on all 3 PDFs with a stand-in parser had no crashes, unique ids, no
   main-body duplicate paragraph ids. NOT yet run with real Docling on
   the full PDFs (the cloud workspace could not download Docling's

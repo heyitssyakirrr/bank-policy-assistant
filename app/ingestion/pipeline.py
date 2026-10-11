@@ -75,7 +75,7 @@ def ingest_document(
     logger.info(
         f"{spec.code}: {len(parsed.blocks)} blocks -> {len(chunks)} chunks in {time.perf_counter() - started:.1f}s"
     )
-    return chunks, report_lines(parsed, annotated, chunks, stats, coverage)
+    return chunks, report_lines(parsed, annotated, chunks, stats, coverage, spec.skip_pages)
 
 
 def write_jsonl_atomically(path: Path, chunks: list[Chunk]) -> None:

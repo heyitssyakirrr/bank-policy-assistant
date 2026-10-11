@@ -489,3 +489,91 @@ def test_two_boxes_after_one_paragraph_get_distinct_keys():
     boxes = [c for c in chunks if "callout" in c.tags]
     assert [b.section_path[-1] for b in boxes] == ["Good practices", "Poor practices 8"]
     assert len({b.chunk_key for b in boxes}) == 2 and stats["duplicate_keys"] == []
+
+
+# ---------------------------------------------------------------- fixes from the first real Docling run (e-KYC)
+
+
+def test_footnote_marker_after_a_paragraph_number():
+    # e-KYC p.12: "...fulfil the requirements in paragraph 8.22 11 ."
+    assert references_footnote("shall fulfil the requirements in paragraph 8.22 11 .", "11")
+
+
+def test_multi_block_footnote_is_merged_and_attached():
+    # e-KYC p.12: footnote 11 continues with its own (i) and (ii) blocks
+    blocks = make_blocks(
+        [
+            (T, 12, "S 8.24 Financial institutions shall ensure that:"),
+            (
+                L,
+                12,
+                "(ii) Prior to implementing the e-KYC solution, financial institutions shall fulfil paragraph 8.22 11 .",
+            ),
+            (F, 12, "11 This requirement must be completed prior to implementation of the e-KYC solution unless:"),
+            (
+                F,
+                12,
+                "(i) Such assessment has already been conducted by the technology provider within the past two (2) years; or",
+            ),
+            (F, 12, "(ii) Where the technology provider has experience in applying the e-KYC solution effectively."),
+        ]
+    )
+    chunks, stats = chunks_for(blocks)
+    para = next(c for c in chunks if c.paragraph_id == "8.24")
+    assert len(para.footnotes) == 1
+    assert (
+        para.footnotes[0].startswith("[11] This requirement")
+        and "(ii) Where the technology provider" in para.footnotes[0]
+    )
+    assert stats["unreferenced_footnotes"] == []
+
+
+def test_footnote_on_a_heading_goes_to_the_first_chunk_under_it():
+    # e-KYC p.10: "C. IDV through e-KYC for legal person 5"
+    blocks = make_blocks(
+        [
+            (H, 10, "C. IDV through e-KYC for legal person 5"),
+            (T, 10, "G 8.12 A financial institution may implement e-KYC to identify and verify legal persons."),
+            (
+                F,
+                10,
+                "5 For avoidance of doubt, a sole proprietor is not deemed as legal person under this policy document.",
+            ),
+        ]
+    )
+    chunks, stats = chunks_for(blocks)
+    para = next(c for c in chunks if c.paragraph_id == "8.12")
+    assert para.footnotes and para.footnotes[0].startswith("[5] For avoidance of doubt")
+    assert stats["unreferenced_footnotes"] == []
+
+
+def test_numbered_list_misread_as_table_becomes_a_paragraph_again():
+    # e-KYC p.20: Docling returned Appendix 2 para 11 as a 3-column table
+    lead = "In respect of paragraph 10 of this Appendix, the notification to the Bank shall include the following-"
+    rows = (
+        ("11.", lead, lead),
+        ("", "(i)", "an assessment on the current performance of the e-KYC solution;"),
+        ("", "(ii)", "proposed rectification actions to reduce the FAR going forward."),
+    )
+    blocks = make_blocks(
+        [
+            (H, 18, "Appendix 2: False Acceptance Rate and sampling"),
+            (
+                L,
+                19,
+                "To strengthen solution performance, a financial institution shall adopt a tiered approach:",
+                "10.",
+            ),
+            Block(index=0, kind=TB, text="", page=20, table_rows=rows),
+            (L, 21, "In respect of paragraph 11 (iv) of this Appendix, the mitigating actions may include:", "12."),
+        ]
+    )
+    chunks, _ = chunks_for(blocks)
+    assert [c.paragraph_id for c in chunks] == ["10", "11", "12"]
+    para_11 = chunks[1]
+    assert para_11.chunk_type is ChunkType.PARAGRAPH
+    assert para_11.text.splitlines() == [
+        f"11. {lead}",
+        "(i) an assessment on the current performance of the e-KYC solution;",
+        "(ii) proposed rectification actions to reduce the FAR going forward.",
+    ]

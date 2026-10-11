@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from app.ingestion.manifest import DocumentSpec
 from app.ingestion.models import AnnotatedBlock, Block, BlockKind, Role
@@ -60,6 +60,35 @@ def is_cross_reference(body: str) -> bool:
     paragraphs start with a capital letter or '(' — never 'and', 'of', ','."""
     first = body.lstrip()[:1]
     return bool(first) and (first.islower() or first in ",.;:)")
+
+
+def _dedupe(cells: Iterable[str]) -> list[str]:
+    """Drop empty cells and cells repeated from the cell before (merged cells
+    are copied into every column they span)."""
+    out: list[str] = []
+    for cell in cells:
+        if cell and (not out or out[-1] != cell):
+            out.append(cell)
+    return out
+
+
+def table_misread_as_paragraph(block: Block, in_appendix: bool) -> Block | None:
+    """Docling sometimes reads an indented numbered list as a table: e-KYC
+    Appendix 2 para 11 came back as | 11. | In respect of ... | (i) | ... |.
+    If the first cell is a paragraph number, turn the rows back into text."""
+    if block.kind is not BlockKind.TABLE or not block.table_rows:
+        return None
+    first_row = _dedupe(block.table_rows[0])
+    if not first_row:
+        return None
+    lead = first_row[0]
+    is_number = PARAGRAPH_START_RE.fullmatch(lead) or (in_appendix and re.fullmatch(r"\d{1,2}\.", lead))
+    if not is_number:
+        return None
+    lines = [" ".join(_dedupe(row)) for row in block.table_rows]
+    return replace(
+        block, kind=BlockKind.TEXT, text="\n".join(line for line in lines if line), table_rows=(), caption=""
+    )
 
 
 def looks_like_title(text: str) -> bool:
@@ -114,8 +143,11 @@ def annotate(blocks: Iterable[Block], spec: DocumentSpec) -> list[AnnotatedBlock
     annotated: list[AnnotatedBlock] = []
 
     for block in blocks:
+        converted = table_misread_as_paragraph(block, in_appendix=state.scope != "main")
+        block = converted or block
+        note = "table re-read as text (first cell is a paragraph number); " if converted else ""
 
-        def emit(role: Role, reason: str, block: Block = block) -> None:
+        def emit(role: Role, reason: str, block: Block = block, note: str = note) -> None:
             # Records the block with the reader's state AFTER the rule ran
             # (so a paragraph that closes a callout box is not tagged "callout").
             tags = spec.tags_for_page(block.page) + (("callout",) if state.callout else ())
@@ -128,7 +160,7 @@ def annotate(blocks: Iterable[Block], spec: DocumentSpec) -> list[AnnotatedBlock
                     provision=state.provision,
                     scope=state.scope,
                     tags=tags,
-                    reason=reason,
+                    reason=note + reason,
                 )
             )
 
