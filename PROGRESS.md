@@ -6,7 +6,7 @@ files you're currently working on) so Claude can pick up exactly where
 you left off, including writing code that fits what already exists.
 
 **Last updated:** 2026-10-11
-**Current phase:** Phase 1 (in progress — ingestion DONE: 1,219 chunks; next: Qdrant + embeddings + hybrid search)
+**Current phase:** Phase 1 (in progress — ingestion DONE; indexing into Qdrant built; next: hybrid retrieval + RRF, then Cohere rerank)
 **Repo:** _(fill in your GitHub link once pushed)_
 
 ---
@@ -217,6 +217,31 @@ Notes:
   order); 249 layout-table rows re-read as paragraphs; only flagged pages
   are the tagged blank forms (148-181). No duplicate keys, all chunks
   <= 350 words. Next: Qdrant + embeddings.
+- 2026-10-11 STEP 1 of retrieval built — indexing into Qdrant:
+  docker-compose adds `qdrant/qdrant:v1.19.1` (dashboard
+  http://localhost:6333/dashboard), client pinned `qdrant-client==1.19.1`.
+  `app/ingestion/indexer.py` (`python -m app.ingestion.indexer`): reads
+  chunks.jsonl, embeds only chunks missing from the EMBEDDING CACHE
+  (app/data/interim/embeddings/<model>-<dim>.jsonl, keyed by
+  content_hash), computes BM25 sparse vectors locally, upserts all points
+  by stable chunk_id, deletes stale points -> Qdrant mirrors chunks.jsonl.
+  `app/services/bm25_encoder.py`: own tokenizer (keeps paragraph ids like
+  14a.9.6 and compounds like aml/cft/cpf + their parts, light plural
+  stemming, modal verbs kept); doc vector = BM25 TF part, Qdrant
+  `Modifier.IDF` supplies IDF. `app/db/vector_repository.py`: only file
+  that talks to Qdrant; search hides `form_template` by default.
+  `app/core/retry.py`: tenacity retry on 429/5xx for Gemini (and Cohere
+  later). `scripts/try_search.py`: dense vs BM25 side by side.
+  Tested: 12 new tests on in-memory Qdrant; full 1,219-chunk corpus
+  indexed locally with BM25 sanity queries ("14A.9.6" -> para 14A.9.6;
+  "sole proprietor legal person" -> 8.12 via its attached footnote 5).
+- 2026-10-11 first real indexer run hit Gemini 429s: the free tier counts
+  EACH TEXT in a batch as one request (limit 100/min = 2 batches of 50),
+  so the daily ~1,000 limit is per text too and 1,219 chunks may need two
+  days. Fixed: `app/core/rate_limit.py` paces by texts AND tokens per
+  minute; indexer checks Qdrant before spending quota, and if embedding
+  stops (daily quota) it indexes what is cached and reports how many are
+  left; the next run sends only those.
 - Verified: 33 unit tests built from real Docling dumps + PDF pages pass; full run
   on all 3 PDFs with a stand-in parser had no crashes, unique ids, no
   main-body duplicate paragraph ids. NOT yet run with real Docling on

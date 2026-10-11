@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     cohere_api_key: str = ""
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/bankpolicy"
+    qdrant_url: str = "http://localhost:6333"  # becomes http://qdrant:6333 when the app runs in Docker
+    qdrant_collection: str = "policy_chunks"
     log_level: str = "INFO"
 
 

@@ -145,4 +145,5 @@ class Chunk:
     def to_dict(self) -> dict:
         data = asdict(self)
         data["chunk_type"] = self.chunk_type.value
+        data["citation"] = self.citation()  # computed once here; search and the UI just read it
         return data

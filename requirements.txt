@@ -8,3 +8,5 @@ sqlalchemy
 psycopg[binary]
 python-multipart
 google-genai
+qdrant-client==1.19.1   # pinned to match the qdrant/qdrant:v1.19.1 server in docker-compose.yml
+tenacity                # retries for Gemini/Cohere on 429 and 5xx

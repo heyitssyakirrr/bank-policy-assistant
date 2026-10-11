@@ -25,9 +25,8 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.core.logging import setup_logging
-
 from app.core.config import settings
+from app.core.logging import setup_logging
 from app.ingestion.chunker import ChunkingConfig, build_chunks
 from app.ingestion.debug import (
     report_lines,

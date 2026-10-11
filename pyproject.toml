@@ -1,7 +1,10 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-filterwarnings = ["ignore::DeprecationWarning:docling_core.*"]
+filterwarnings = [
+    "ignore::DeprecationWarning:docling_core.*",
+    "ignore:Payload indexes have no effect in the local Qdrant:UserWarning",  # tests use in-memory Qdrant
+]
 
 [tool.ruff]
 line-length = 120

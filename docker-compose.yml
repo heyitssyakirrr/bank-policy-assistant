@@ -11,5 +11,17 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  # Vector database for the policy chunks (dense + BM25 vectors).
+  # Postgres stays for chat sessions/messages.
+  qdrant:
+    image: qdrant/qdrant:v1.19.1          # pinned: keep in step with qdrant-client in requirements.txt
+    restart: unless-stopped
+    ports:
+      - "6333:6333"                       # REST API + web dashboard: http://localhost:6333/dashboard
+      - "6334:6334"                       # gRPC (faster client protocol, optional)
+    volumes:
+      - qdrant_data:/qdrant/storage       # survives container restarts
+
 volumes:
   pgdata:
+  qdrant_data:
