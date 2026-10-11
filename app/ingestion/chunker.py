@@ -49,6 +49,13 @@ def references_footnote(text: str, number: str) -> bool:
 
 
 LEAD_IN_WORDS = 60
+WORD_RE = re.compile(r"\w+")
+
+
+def count_words(text: str) -> int:
+    """Real words only. A markdown table's "|" and "---" separators are not
+    content and must not push a table over the size limit."""
+    return len(WORD_RE.findall(text))
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,13 +271,24 @@ def _split_unit_text(unit: _Unit, max_words: int) -> list[tuple[str, list[int]]]
     if unit.chunk_type is ChunkType.TABLE:
         header, body = unit.table_rows[:1], unit.table_rows[1:]
         whole = unit.text
-        if len(whole.split()) <= max_words or not body:
+        if count_words(whole) <= max_words:
             return [(whole, unit.pages)]
+        if not body:  # a one-row "table" that is too big: plain word split
+            return [(piece, unit.pages) for piece in _split_words(whole, max_words)]
         parts, current = [], []
-        header_words = len(_render_table(header, unit.caption, unit.lead_in).split())
+        header_words = count_words(_render_table(header, unit.caption, unit.lead_in))
         for row in body:
-            row_words = len(" ".join(row).split())
-            if current and header_words + sum(len(" ".join(r).split()) for r in current) + row_words > max_words:
+            row_words = count_words(" ".join(row))
+            if header_words + row_words > max_words:
+                # One row alone is too big (AML Appendix 8b): flush, then split the row's text.
+                if current:
+                    parts.append(_render_table(header + current, unit.caption, unit.lead_in))
+                    current = []
+                budget = max(max_words - header_words, max_words // 2)
+                for piece in _split_words(" | ".join(cell for cell in row if cell), budget):
+                    parts.append(_render_table(header + [(piece,)], unit.caption, unit.lead_in))
+                continue
+            if current and header_words + sum(count_words(" ".join(r)) for r in current) + row_words > max_words:
                 parts.append(_render_table(header + current, unit.caption, unit.lead_in))
                 current = []
             current.append(row)
@@ -281,7 +299,7 @@ def _split_unit_text(unit: _Unit, max_words: int) -> list[tuple[str, list[int]]]
     pieces: list[tuple[str, int]] = []  # (text, page)
     for ab in unit.blocks:
         text = ab.block.full_text
-        if len(text.split()) > max_words:
+        if count_words(text) > max_words:
             pieces.extend((part, ab.block.page) for part in _split_words(text, max_words))
         else:
             pieces.append((text, ab.block.page))
@@ -291,7 +309,7 @@ def _split_unit_text(unit: _Unit, max_words: int) -> list[tuple[str, list[int]]]
     current_pages: list[int] = []
     current_words = 0
     for text, page in pieces:
-        words = len(text.split())
+        words = count_words(text)
         if current_texts and current_words + words > max_words:
             parts.append(("\n".join(current_texts), current_pages))
             current_texts, current_pages, current_words = [], [], 0
@@ -402,7 +420,7 @@ def build_chunks(
                     text=text,
                     footnotes=list(notes),
                     embed_text=embed_text,
-                    word_count=len(text.split()),
+                    word_count=count_words(text),
                     content_hash=hashlib.sha256(embed_text.encode("utf-8")).hexdigest()[:16],
                     block_indexes=[ab.block.index for ab in unit.blocks],
                 )

@@ -61,6 +61,7 @@ class Block:
     source_label: str = ""  # the parser's own label, kept only for debugging
     table_rows: tuple[tuple[str, ...], ...] = ()  # TABLE only: cell text, row by row
     caption: str = ""  # TABLE only
+    top: float | None = None  # distance from the top of the page (points); lines up side-by-side columns
 
     @property
     def full_text(self) -> str:

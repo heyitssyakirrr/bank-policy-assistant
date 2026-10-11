@@ -6,7 +6,7 @@ files you're currently working on) so Claude can pick up exactly where
 you left off, including writing code that fits what already exists.
 
 **Last updated:** 2026-10-11
-**Current phase:** Phase 1 (in progress — structure-aware ingestion pipeline built; next: run it with Docling, then Qdrant + embeddings)
+**Current phase:** Phase 1 (in progress — ingestion DONE: 1,219 chunks; next: Qdrant + embeddings + hybrid search)
 **Repo:** _(fill in your GitHub link once pushed)_
 
 ---
@@ -51,7 +51,7 @@ bank-policy-assistant/
       debug/                    *.1_blocks / *.2_structure / *.3_chunks .txt + report.txt (gitignored)
     static/          index.html, style.css, chat.js
   scripts/           test_embeddings.py
-  tests/             test_ingestion.py (27 tests, no models/PDFs needed)
+  tests/             test_ingestion.py (33 tests, no models/PDFs needed)
   requirements.txt (app) / requirements-ingest.txt (+docling, pymupdf, pyyaml) / requirements-dev.txt (+pytest, ruff)
   pyproject.toml     pytest + ruff config
   docker-compose.yml, Dockerfile (empty), docs/, evals/ (empty placeholders)
@@ -195,7 +195,29 @@ Notes:
   the real blocks: 108 chunks, 0 unmatched footnotes, 0 duplicates, all
   57 main-body paragraphs present. Known, accepted: Docling scrambles
   the order of App. 3 para 7(g)/(h) on p.24 (text kept, order off).
-- Verified: 27 unit tests built from real Docling dumps + PDF pages pass; full run
+- 2026-10-11 first FULL run (all 3 PDFs, real Docling): FTFC perfect
+  (120/120 paragraphs, S/G all correct, callouts tagged); e-KYC perfect.
+  AML exposed two layout problems, both fixed:
+  (1) Docling read many AML pages as 3-column TABLES (| S | 10.3.1 | text |)
+      -> "layout tables" whose rows start with paragraph numbers are
+      unpacked back into paragraphs (sub-heading rows -> headings).
+      Missing AML paragraphs 299 -> 2.
+  (2) AML's separate S/G column comes out in unreliable reading order
+      (before OR after its paragraph) -> markers matched to the paragraph
+      on the same LINE using Docling's bounding boxes (`Block.top`);
+      reading-order queue is only the fallback. Report shows how many were
+      matched each way; the blocks dump shows y= positions.
+  Also: merged table cells no longer duplicated (parser uses cell span
+  offsets); chunk size counts real words, not markdown pipes.
+  Known, accepted: AML 14A.14.1 and 14B.16.2 are merged into a
+  neighbouring paragraph by Docling (text kept, boundary wrong).
+- 2026-10-11 INGESTION DONE. Final full run: e-KYC 108, FTFC 232, AML 879
+  -> 1,219 chunks in app/data/processed/chunks.jsonl. AML: 182 of 182
+  split-off S/G markers matched by position (0 fell back to reading
+  order); 249 layout-table rows re-read as paragraphs; only flagged pages
+  are the tagged blank forms (148-181). No duplicate keys, all chunks
+  <= 350 words. Next: Qdrant + embeddings.
+- Verified: 33 unit tests built from real Docling dumps + PDF pages pass; full run
   on all 3 PDFs with a stand-in parser had no crashes, unique ids, no
   main-body duplicate paragraph ids. NOT yet run with real Docling on
   the full PDFs (the cloud workspace could not download Docling's

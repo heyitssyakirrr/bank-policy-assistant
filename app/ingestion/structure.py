@@ -29,7 +29,7 @@ part that continues onto the next page.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field, replace
 
 from app.ingestion.manifest import DocumentSpec
@@ -48,6 +48,7 @@ LONE_PROVISION_RE = re.compile(r"^[SG]$")
 # Trailing number allowed: a box title can carry a footnote marker ("Good practices 8").
 CALLOUT_RE = re.compile(r"^(?:(?:good|poor)\s+practices?|examples?|illustrations?)(?:\s+\d{1,3})?$", re.IGNORECASE)
 
+MARKER_ALIGN_TOLERANCE = 8.0  # points: an "S" and its paragraph number sit on the same line
 MAX_HEADING_WORDS = 12  # longer than this, a "numbered title" is really a sentence
 SENTENCE_END = (".", ";", ":", ",", "-", "—")
 
@@ -72,23 +73,100 @@ def _dedupe(cells: Iterable[str]) -> list[str]:
     return out
 
 
-def table_misread_as_paragraph(block: Block, in_appendix: bool) -> Block | None:
-    """Docling sometimes reads an indented numbered list as a table: e-KYC
-    Appendix 2 para 11 came back as | 11. | In respect of ... | (i) | ... |.
-    If the first cell is a paragraph number, turn the rows back into text."""
+def _is_number_cell(cell: str, in_appendix: bool) -> bool:
+    return bool(re.fullmatch(PARAGRAPH_ID, cell) or (in_appendix and re.fullmatch(r"\d{1,2}\.", cell)))
+
+
+def _is_numbered_row(cells: list[str], in_appendix: bool) -> bool:
+    """| S | 10.3.1 | text |  or  | 11. | text |  or  | 10.4 PF Risk Assessment |"""
+    if len(cells) >= 2 and cells[0] in ("S", "G") and _is_number_cell(cells[1], in_appendix):
+        return True
+    return _is_number_cell(cells[0], in_appendix) or bool(PARAGRAPH_START_RE.match(cells[0]))
+
+
+def unpack_layout_table(block: Block, in_appendix: bool) -> list[Block] | None:
+    """Docling sometimes reads ordinary numbered paragraphs as a TABLE because
+    of a column layout. AML puts S/G, the number and the text in three
+    columns, so whole pages came back as | S | 10.3.1 | Reporting ... |.
+    e-KYC Appendix 2 para 11 came back as | 11. | In respect of ... |.
+
+    If the first row, or at least half the rows, start with a paragraph
+    number, the "table" is really text: each row becomes one text block
+    ("S 10.3.1 Reporting ...") and the normal rules take it from there.
+    Real tables (FAR thresholds, glossary terms) don't start rows with
+    paragraph numbers, so they are left alone."""
     if block.kind is not BlockKind.TABLE or not block.table_rows:
         return None
-    first_row = _dedupe(block.table_rows[0])
-    if not first_row:
+    rows = [cells for cells in (_dedupe(row) for row in block.table_rows) if cells]
+    if not rows:
         return None
-    lead = first_row[0]
-    is_number = PARAGRAPH_START_RE.fullmatch(lead) or (in_appendix and re.fullmatch(r"\d{1,2}\.", lead))
-    if not is_number:
+    numbered = sum(_is_numbered_row(cells, in_appendix) for cells in rows)
+    if not (_is_numbered_row(rows[0], in_appendix) or numbered * 2 >= len(rows)):
         return None
-    lines = [" ".join(_dedupe(row)) for row in block.table_rows]
-    return replace(
-        block, kind=BlockKind.TEXT, text="\n".join(line for line in lines if line), table_rows=(), caption=""
-    )
+    return [
+        replace(
+            block,
+            # A lone short row with no number is a sub-heading whose number Docling
+            # dropped ("| | Internal Suspicious Transaction Reports | ... |").
+            kind=BlockKind.HEADING if len(cells) == 1 and looks_like_title(cells[0]) else BlockKind.TEXT,
+            text=" ".join(cells),
+            table_rows=(),
+            caption="",
+        )
+        for cells in rows
+    ]
+
+
+def align_markers(blocks: list[Block]) -> tuple[dict[int, str], set[int]]:
+    """Pair each standalone "S"/"G" with the paragraph number on the same line.
+
+    In AML the S/G sits in its own column, far left of the number, and
+    Docling emits that column in an unreliable order: sometimes before the
+    paragraphs, sometimes after. Reading order can't be trusted, but
+    position can: the marker and its paragraph share a line, i.e. the same
+    distance from the top of the page.
+
+    Returns ({paragraph block index: "S"/"G"}, {marker block indexes used})."""
+    markers: dict[int, list[Block]] = {}
+    candidates: dict[int, list[Block]] = {}
+    for block in blocks:
+        if block.top is None or block.kind is BlockKind.TABLE:
+            continue
+        text = block.full_text
+        if LONE_PROVISION_RE.match(text):
+            markers.setdefault(block.page, []).append(block)
+            continue
+        match = PARAGRAPH_START_RE.match(text)
+        if match and match.group("provision") is None and not is_cross_reference(match.group("body")):
+            candidates.setdefault(block.page, []).append(block)
+
+    assigned: dict[int, str] = {}
+    used: set[int] = set()
+    for page, page_markers in markers.items():
+        pairs = sorted(
+            (abs(m.top - c.top), m.index, c.index, m.full_text)
+            for m in page_markers
+            for c in candidates.get(page, [])
+            if abs(m.top - c.top) <= MARKER_ALIGN_TOLERANCE
+        )
+        for _distance, marker_index, para_index, marker in pairs:  # closest pairs first
+            if marker_index not in used and para_index not in assigned:
+                used.add(marker_index)
+                assigned[para_index] = marker
+    return assigned, used
+
+
+def _unpack_tables(blocks: Iterable[Block], state: _State) -> Iterator[tuple[Block, str]]:
+    """Yields (block, note). Lazy on purpose: whether "11." counts as a
+    paragraph number depends on being inside an appendix, which is only
+    known once the blocks before this one have been read."""
+    for block in blocks:
+        rows = unpack_layout_table(block, in_appendix=state.scope != "main")
+        if rows is None:
+            yield block, ""
+        else:
+            for row in rows:
+                yield row, "table row re-read as text (row starts with a paragraph number); "
 
 
 def looks_like_title(text: str) -> bool:
@@ -116,13 +194,21 @@ class _State:
     scope: str = "main"
     paragraph_id: str | None = None
     provision: str | None = None
-    pending_provision: str | None = None  # an "S"/"G" the parser split off from its paragraph number
+    # "S"/"G" markers the parser split off from their paragraph numbers, in
+    # order. AML's marker column often comes out as several "S" blocks at the
+    # top of a page, before the paragraphs they belong to: a queue, per page.
+    pending_provisions: list[tuple[str, int]] = field(default_factory=list)
     callout: str | None = None  # "Good practices" while inside such a box
 
     @property
     def section_path(self) -> tuple[str, ...]:
         path = tuple(self.headings[level] for level in sorted(self.headings))
         return path + (self.callout,) if self.callout else path
+
+    def take_pending_provision(self, page: int) -> str | None:
+        """Oldest queued marker from this page; markers from earlier pages are stale."""
+        self.pending_provisions = [(m, p) for m, p in self.pending_provisions if p == page]
+        return self.pending_provisions.pop(0)[0] if self.pending_provisions else None
 
     def set_heading(self, level: int, text: str) -> None:
         for deeper in [lvl for lvl in self.headings if lvl >= level]:
@@ -134,18 +220,16 @@ class _State:
         # A heading closes the open paragraph: text after it is new content.
         self.paragraph_id = None
         self.provision = None
-        self.pending_provision = None
         self.callout = None
 
 
 def annotate(blocks: Iterable[Block], spec: DocumentSpec) -> list[AnnotatedBlock]:
     state = _State()
     annotated: list[AnnotatedBlock] = []
+    blocks = list(blocks)
+    aligned_provision, aligned_markers = align_markers(blocks)
 
-    for block in blocks:
-        converted = table_misread_as_paragraph(block, in_appendix=state.scope != "main")
-        block = converted or block
-        note = "table re-read as text (first cell is a paragraph number); " if converted else ""
+    for block, note in _unpack_tables(blocks, state):
 
         def emit(role: Role, reason: str, block: Block = block, note: str = note) -> None:
             # Records the block with the reader's state AFTER the rule ran
@@ -181,8 +265,11 @@ def annotate(blocks: Iterable[Block], spec: DocumentSpec) -> list[AnnotatedBlock
 
         # Rule 0: a lone "S"/"G" (the marker column split off by the parser) applies to the next paragraph.
         if LONE_PROVISION_RE.match(text):
-            state.pending_provision = text
-            emit(Role.SKIP, "standalone S/G marker, applied to the next paragraph number")
+            if block.index in aligned_markers:
+                emit(Role.SKIP, "standalone S/G marker, matched by position to the paragraph on its line")
+            else:  # no position to match on: fall back to reading order
+                state.pending_provisions.append((text, block.page))
+                emit(Role.SKIP, "standalone S/G marker, no position match: queued for the next paragraph on this page")
             continue
 
         # Rule 0b: a callout box title ("Good practices"). The box illustrates the
@@ -199,17 +286,16 @@ def annotate(blocks: Iterable[Block], spec: DocumentSpec) -> list[AnnotatedBlock
         if match and match.group("provision") is None and is_cross_reference(match.group("body")):
             match = None  # fall through: it's text that happens to start with a paragraph number
         if match:
-            if (
-                match.group("provision") is None
-                and not state.pending_provision
-                and looks_like_title(match.group("body"))
-            ):
+            if match.group("provision") is None and looks_like_title(match.group("body")):
                 state.set_heading(LEVEL_SUBHEADING, text)
                 emit(Role.HEADING, "numbered title (short, no S/G, no sentence ending)")
             else:
                 state.paragraph_id = match.group("pid")
-                state.provision = match.group("provision") or state.pending_provision
-                state.pending_provision = None
+                state.provision = (
+                    match.group("provision")
+                    or aligned_provision.get(block.index)
+                    or state.take_pending_provision(block.page)
+                )
                 state.callout = None
                 emit(Role.PARAGRAPH_START, "paragraph number" + (" + S/G marker" if state.provision else ""))
             continue

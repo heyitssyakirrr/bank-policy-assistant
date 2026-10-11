@@ -17,7 +17,7 @@ from docling_core.types.doc import (
 from docling_core.types.doc.base import BoundingBox
 from docling_core.types.doc.document import TableCell, TableData
 
-from app.ingestion.chunker import ChunkingConfig, build_chunks, references_footnote
+from app.ingestion.chunker import ChunkingConfig, build_chunks, count_words, references_footnote
 from app.ingestion.manifest import DocumentSpec, parse_page_spec
 from app.ingestion.models import Block, BlockKind, ChunkType, ParsedDocument, Role
 from app.ingestion.parser import to_parsed_document
@@ -331,9 +331,11 @@ def test_reference_numbers_are_not_mistaken_for_footnote_markers():
 def test_oversized_paragraph_is_split_on_block_boundaries_and_ids_are_stable():
     first, _ = chunks_for(MAIN_BODY, max_words=30)
     para_88 = [c for c in first if c.paragraph_id == "8.8"]
-    assert len(para_88) == 2 and [c.part_index for c in para_88] == [1, 2]
+    assert len(para_88) >= 2
+    assert [c.part_index for c in para_88] == list(range(1, len(para_88) + 1))
+    assert all(c.part_count == len(para_88) for c in para_88)
     assert all(c.word_count <= 30 for c in para_88)
-    assert "part 1 of 2" in para_88[0].embed_text
+    assert f"part 1 of {len(para_88)}" in para_88[0].embed_text
     again, _ = chunks_for(MAIN_BODY, max_words=30)
     assert [c.chunk_id for c in first] == [c.chunk_id for c in again]  # re-running = same ids = idempotent upserts
 
@@ -577,3 +579,87 @@ def test_numbered_list_misread_as_table_becomes_a_paragraph_again():
         "(i) an assessment on the current performance of the e-KYC solution;",
         "(ii) proposed rectification actions to reduce the FAR going forward.",
     ]
+
+
+# ---------------------------------------------------------------- fixes from the first full run (AML, FTFC)
+
+AML_SPEC = DocumentSpec(code="amlcft", file="aml.pdf", title="AML Policy Document")
+
+
+def test_aml_three_column_layout_read_as_table_is_unpacked_into_paragraphs():
+    # AML p.22: Docling returned paragraphs as | S | 10.3.1 | text | rows
+    rows = (
+        ("S", "10.3.1", "Reporting institutions are required to: (a) have policies, procedures and controls;"),
+        ("", "10.4 PF Risk Assessment", "10.4 PF Risk Assessment"),
+        ("S", "10.4.1", "Reporting institutions are required to identify, assess and understand PF risks."),
+        (
+            "G",
+            "10.4.2",
+            "In conducting the risk assessment, reporting institutions may consider existing methodologies.",
+        ),
+    )
+    blocks = make_blocks(
+        [(H, 22, "10.3 ML/TF Risk Control and Mitigation"), Block(index=0, kind=TB, text="", page=22, table_rows=rows)]
+    )
+    annotated = annotate(blocks, AML_SPEC)
+    starts = [(ab.paragraph_id, ab.provision) for ab in annotated if ab.role is Role.PARAGRAPH_START]
+    assert starts == [("10.3.1", "S"), ("10.4.1", "S"), ("10.4.2", "G")]
+    para = next(ab for ab in annotated if ab.paragraph_id == "10.4.1")
+    assert para.section_path[-1] == "10.4 PF Risk Assessment"  # the row that was a heading became a heading
+
+
+def test_real_tables_are_not_unpacked():
+    blocks = make_blocks([Block(index=0, kind=TB, text="", page=19, table_rows=FAR_ROWS_P19)])
+    assert [ab.role for ab in annotate(blocks, SPEC)] == [Role.TABLE]
+
+
+def test_sg_markers_are_matched_by_position_not_reading_order():
+    # AML p.24 and p.37: the "S"/"G" column comes out AFTER its paragraphs, out of order
+    def at(kind, text, top, marker=""):
+        return Block(index=0, kind=kind, text=text, page=24, marker=marker, top=top)
+
+    blocks = make_blocks(
+        [
+            at(L, "Reporting institutions shall provide timely reporting of the risk assessment.", 100.0, "10.7.1"),
+            at(L, "Reporting institutions may refer to the guidance provided in Appendix 1.", 200.0, "10.8.1"),
+            at(T, "G", 201.5),  # belongs to 10.8.1 (same line)
+            at(T, "S", 100.8),  # belongs to 10.7.1
+        ]
+    )
+    starts = {ab.paragraph_id: ab.provision for ab in annotate(blocks, SPEC) if ab.role is Role.PARAGRAPH_START}
+    assert starts == {"10.7.1": "S", "10.8.1": "G"}
+
+
+def test_markers_without_position_fall_back_to_reading_order():
+    blocks = make_blocks(
+        [
+            (T, 21, "S"),
+            (T, 21, "S"),
+            (H, 21, "10.1 Risk Management Functions"),
+            (
+                L,
+                21,
+                "In the context of a risk-based approach, risk management functions shall be proportionate.",
+                "10.1.1",
+            ),
+            (L, 21, "The risk management function must be aligned with overall risk management.", "10.1.2"),
+        ]
+    )
+    starts = [(ab.paragraph_id, ab.provision) for ab in annotate(blocks, SPEC) if ab.role is Role.PARAGRAPH_START]
+    assert starts == [("10.1.1", "S"), ("10.1.2", "S")]
+
+
+def test_table_pipes_are_not_counted_as_words():
+    assert count_words("| Level 1 | monitor |\n|---|---|") == 3  # Level, 1, monitor
+
+
+def test_unnumbered_heading_row_inside_unpacked_table_is_a_heading():
+    # AML p.109: the "22.4" heading row came back without its number
+    rows = (
+        ("G", "22.3.4", "Reporting institutions may be guided by examples of suspicious transactions."),
+        ("", "Internal Suspicious Transaction Reports", "Internal Suspicious Transaction Reports"),
+        ("S", "22.4.1", "Reporting institutions must ensure that the Compliance Officer maintains a complete file."),
+    )
+    annotated = annotate(make_blocks([Block(index=0, kind=TB, text="", page=109, table_rows=rows)]), AML_SPEC)
+    assert [ab.role for ab in annotated] == [Role.PARAGRAPH_START, Role.HEADING, Role.PARAGRAPH_START]
+    assert annotated[2].section_path[-1] == "Internal Suspicious Transaction Reports"

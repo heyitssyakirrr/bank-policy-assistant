@@ -21,12 +21,7 @@ import logging
 import re
 from pathlib import Path
 
-from docling_core.types.doc import (
-    ContentLayer,
-    DocItemLabel,
-    DoclingDocument,
-    TableItem,
-)
+from docling_core.types.doc import ContentLayer, CoordOrigin, DocItemLabel, DoclingDocument, TableItem
 
 from app.ingestion.models import Block, BlockKind, ParsedDocument
 
@@ -63,8 +58,18 @@ def clean_text(text: str) -> str:
 
 
 def table_rows(item: TableItem) -> tuple[tuple[str, ...], ...]:
-    rows = (tuple(clean_text(cell.text) for cell in row) for row in item.data.grid)
-    return tuple(row for row in rows if any(row))
+    """Cell text, row by row. A merged cell appears in Docling's grid once per
+    column it spans ("Qualitative criteria 1" twice in FTFC p.50); only its
+    first column keeps the text, so words aren't duplicated."""
+    rows = []
+    for row in item.data.grid:
+        cells = []
+        for col, cell in enumerate(row):
+            spanned_from_left = getattr(cell, "start_col_offset_idx", col) < col
+            cells.append("" if spanned_from_left else clean_text(cell.text))
+        if any(cells):
+            rows.append(tuple(cells))
+    return tuple(rows)
 
 
 def rows_to_markdown(rows: tuple[tuple[str, ...], ...]) -> str:
@@ -80,6 +85,18 @@ def rows_to_markdown(rows: tuple[tuple[str, ...], ...]) -> str:
     lines = [fmt(padded[0]), "|" + "---|" * width]
     lines += [fmt(row) for row in padded[1:]]
     return "\n".join(lines)
+
+
+def _top_of(doc: DoclingDocument, prov) -> float | None:
+    """Distance of the block's top edge from the top of its page. PDFs measure
+    from the bottom, so convert; two blocks on the same line get ~equal values."""
+    bbox = getattr(prov, "bbox", None)
+    if bbox is None:
+        return None
+    if bbox.coord_origin == CoordOrigin.TOPLEFT:
+        return round(bbox.t, 1)
+    page = doc.pages.get(prov.page_no)
+    return round(bbox.to_top_left_origin(page_height=page.size.height).t, 1) if page else None
 
 
 def to_parsed_document(doc: DoclingDocument, *, doc_code: str, source_file: str, source_sha256: str) -> ParsedDocument:
@@ -123,6 +140,7 @@ def to_parsed_document(doc: DoclingDocument, *, doc_code: str, source_file: str,
                     source_label=label.value,
                     table_rows=rows,
                     caption=clean_text(item.caption_text(doc)),
+                    top=_top_of(doc, prov[0]),
                 )
             )
             continue
@@ -138,6 +156,7 @@ def to_parsed_document(doc: DoclingDocument, *, doc_code: str, source_file: str,
                 page=page,
                 marker=clean_text(getattr(item, "marker", "") or ""),
                 source_label=label.value,
+                top=_top_of(doc, prov[0]),
             )
         )
 

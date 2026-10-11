@@ -26,13 +26,14 @@ def write_blocks(path: Path, parsed: ParsedDocument) -> None:
     lines = [
         f"PARSER OUTPUT: {parsed.source_file} ({parsed.page_count} pages, {len(parsed.blocks)} blocks)",
         f"Printed page numbers found on {len(parsed.printed_pages)} pages (from headers/footers, which are not indexed)",
-        "Format: #block pPDFpage [printed page] kind marker | text",
+        "Format: #block pPDFpage [printed page] kind marker y=position | text",
         RULE,
     ]
     for b in parsed.blocks:
         printed = parsed.printed_pages.get(b.page, "-")
         marker = f" marker={b.marker!r}" if b.marker else ""
-        head = f"#{b.index:04d} p{b.page:<3} [{printed:>3}] {b.kind.value:<9}{marker}"
+        top = f" y={b.top:.0f}" if b.top is not None else ""  # distance from page top: same y = same line
+        head = f"#{b.index:04d} p{b.page:<3} [{printed:>3}] {b.kind.value:<9}{marker}{top}"
         if b.table_rows:
             caption = f" caption={b.caption!r}" if b.caption else ""
             lines.append(f"{head}{caption} ({len(b.table_rows)} rows)\n{b.text}")
@@ -101,6 +102,10 @@ def report_lines(
         f"chunk words: min={min(words)} median={int(statistics.median(words))} max={max(words)}",
         f"tagged chunks: {dict(Counter(tag for c in chunks for tag in c.tags))}",
         f"units split for size: {stats['split_units']}",
+        "S/G markers split from their paragraph: "
+        f"{sum('matched by position' in ab.reason for ab in annotated)} matched by position, "
+        f"{sum('no position match' in ab.reason for ab in annotated)} by reading order (less reliable)",
+        f"tables re-read as numbered paragraphs (rows): {sum('table row re-read' in ab.reason for ab in annotated)}",
         f"pages with no printed page number: {missing_printed or 'none'}",
     ]
     if stats["duplicate_keys"]:
