@@ -1,4 +1,4 @@
-from app.services.embeddings import embed_batch
+from app.services.embedding_service import embed_batch
 
 
 def main():

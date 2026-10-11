@@ -5,8 +5,8 @@ this file + PROJECT_PLAN.md + your GitHub repo link (or the specific
 files you're currently working on) so Claude can pick up exactly where
 you left off, including writing code that fits what already exists.
 
-**Last updated:** 2026-10-08
-**Current phase:** Phase 1 (in progress — extraction/cleaning/chunking done, embeddings next)
+**Last updated:** 2026-10-11
+**Current phase:** Phase 1 (in progress — structure-aware ingestion pipeline built; next: run it with Docling, then Qdrant + embeddings)
 **Repo:** _(fill in your GitHub link once pushed)_
 
 ---
@@ -28,32 +28,33 @@ you left off, including writing code that fits what already exists.
 bank-policy-assistant/
   app/
     main.py
-    core/
-      config.py
-      db.py
-      logging.py
-    api/routes/
-      chat.py         # POST /chat — echo stub only, no RAG yet
-      health.py        # GET /health — checks DB connectivity
-    schemas/
-      chat.py          # ChatRequest / ChatResponse Pydantic models
-    static/
-      index.html
-      style.css
-      chat.js
-  docker-compose.yml    # postgres (pgvector/pgvector:pg16) — running
-  requirements.txt
-  .env / .env.example
-  .gitignore
-
-Not yet created (planned, not started):
-  app/core/retry.py           # deferred — no external API calls yet to retry
-  app/api/routes/sessions.py
-  app/db/ (models.py, vector_repository.py, chat_repository.py)
-  app/services/
-  app/data/raw_pdfs/           # PDFs not yet placed here
-  scripts/, evals/, tests/, docs/
-  Dockerfile
+    core/            config.py, db.py, logging.py, retry.py (empty)
+    api/routes/      chat.py (echo stub), health.py, sessions.py (empty)
+    schemas/         chat.py
+    services/        embedding_service.py (renamed from embeddings.py)
+                     retrieval/rerank/generation/chat_service.py (empty placeholders)
+    db/              models.py, chat_repository.py, vector_repository.py (empty placeholders)
+    ingestion/       OFFLINE pipeline, never imported by the API
+      models.py      Block, AnnotatedBlock, Chunk (+ enums): the contract between stages
+      parser.py      Docling -> Blocks (only file that imports Docling; JSON cache by PDF sha256)
+      structure.py   regex rules: paragraph ids, S/G, headings, section path, appendix scope
+      chunker.py     paragraph chunks, table stitching + lead-in, footnotes, size splits, stable ids
+      manifest.py    loads data/ingest_manifest.yaml
+      quality.py     per-page word coverage vs PyMuPDF (flags dropped/duplicated text)
+      debug.py       human-readable dumps per stage + report
+      pipeline.py    CLI: python -m app.ingestion.pipeline [--doc ekyc] [--reparse]
+    data/
+      raw_pdfs/                 the 3 BNM PDFs
+      ingest_manifest.yaml      reviewed per-document decisions (skip/tag pages)
+      interim/docling/          cached Docling parses (gitignored)
+      processed/chunks.jsonl    pipeline output = input of the embedding step (gitignored)
+      debug/                    *.1_blocks / *.2_structure / *.3_chunks .txt + report.txt (gitignored)
+    static/          index.html, style.css, chat.js
+  scripts/           test_embeddings.py
+  tests/             test_ingestion.py (23 tests, no models/PDFs needed)
+  requirements.txt (app) / requirements-ingest.txt (+docling, pymupdf, pyyaml) / requirements-dev.txt (+pytest, ruff)
+  pyproject.toml     pytest + ruff config
+  docker-compose.yml, Dockerfile (empty), docs/, evals/ (empty placeholders)
 ```
 
 ## Document structure findings (from reading the PDFs, 2026-10-11)
@@ -85,10 +86,17 @@ Not yet created (planned, not started):
   path, paragraph number, S/G, block_type (paragraph / table / callout /
   form); tables become their own chunks and are stitched across pages;
   cite as "para 8.2 (S), p.6 of 28".
-- Next: compare Docling vs PyMuPDF on e-KYC with
-  `scripts/compare_parsers.py` against 4 checks (FAR table intact,
-  S marker kept with its paragraph, headers/footers gone, footnotes
-  separated).
+- Parser trial done (see decisions log): Docling structured items won.
+- Paragraph id shapes across all 3 PDFs: `8.1`, `10.1.1`, `14A.9.6`.
+  Numbering RESTARTS in appendices (AML Appendix 1 has its own 1.1), so
+  chunk identity = document + scope (main / Appendix N) + paragraph id.
+- Some numbered lines are titles, not provisions (`29.1 Definition and
+  Interpretation`, `4.0 Relationship-based Risk Assessment`): short, no
+  S/G, no sentence ending -> heading.
+- Wrapped cross-references ("...under paragraphs / 8.10 and 8.13 of...")
+  look like paragraph starts; real paragraphs start with a capital or "(".
+- Blank forms confirmed: AML Appendix 2 (pp.148-151), 8a/8b (169-170),
+  9/9a/9b (171-181). Appendix 5 (CTR table) is real content and stays.
 
 ## Current DB schema (actual, not planned)
 Postgres + pgvector container is running and reachable (`/health` confirms
@@ -127,7 +135,7 @@ Status: [ ] Not started / [x] In progress / [ ] Done
 Notes:
 - Real PDF filenames in `app/data/raw_pdfs/`: `pd-ekyc-apr2024.pdf`,
   `pd-ftfc-mar24.pdf`, `PD_AMLCFTCPF_TFS_FI_Feb2024_v2.pdf`
-- `app/services/ingestion_service.py` built: `extract_pages` (PyMuPDF,
+- (SUPERSEDED 2026-10-11, see below) `app/services/ingestion_service.py` built: `extract_pages` (PyMuPDF,
   per-page text), `detect_header_length` + `clean_pages` (strips a
   repeated running header/footer per document — detected generically by
   growing a matched leading-word prefix across pages, digits normalized,
@@ -136,9 +144,9 @@ Notes:
 - Header stripping verified correct by eye against each PDF (page 1
   cover pages correctly left untouched since they don't match the
   header pattern; inner pages correctly cleaned) — see decisions log
-- Default chunking: 350 words/chunk, 50-word overlap (~465-470 tokens,
+- (old) Default chunking: 350 words/chunk, 50-word overlap (~465-470 tokens,
   within the typical 200-500 token production range)
-- Final clean chunk counts: e-KYC 47, Fair Treatment 81, AML/CFT/CPF/TFS
+- (old word-count chunker) Final clean chunk counts: e-KYC 47, Fair Treatment 81, AML/CFT/CPF/TFS
   193 — total 321 chunks across the corpus
 - `scripts/ingest_documents.py` (Step 1, extraction+chunking only, no
   API calls) confirmed working end-to-end with clean sample output
@@ -159,11 +167,32 @@ Notes:
   yet), embed all 321 chunks into pgvector, build hybrid search
   (vector + full-text) + RRF fusion + Cohere rerank, wire into
   `/chat`, persist chat history
-- Known weaknesses of the current ingestion code, to fix before
-  embedding at scale: extraction, cleaning and chunking all live in
-  one module; chunks never cross page boundaries (clauses that span
-  pages get cut); header detection assumes the header is first in the
-  PDF text stream and doesn't handle footers generally
+- 2026-10-11: ingestion rebuilt as `app/ingestion/` (replaces
+  `ingestion_service.py` + `scripts/ingest_documents.py`; old word-count
+  chunker and header-stripping heuristic deleted). One chunk per
+  numbered paragraph (sub-items, trailing text and page-break
+  continuations included), tables as own chunks (stitched across pages,
+  prefixed with their lead-in sentence), footnotes attached to the chunk
+  that references them, oversized units split at block boundaries
+  (max 350 words), contextual header prepended to `embed_text`,
+  deterministic UUIDv5 chunk ids (idempotent upserts later), printed
+  page numbers read from page headers for citations.
+- Layout differences handled (checked on FTFC p.11-12, AML p.9/40/132):
+  FTFC "Good practices"/"Poor practices" boxes -> separate chunks tagged
+  `callout`, tied to the paragraph above, never leaking into the next
+  paragraph's section path; AML's S/G sits in its own far-left column ->
+  a lone "S"/"G" block is carried to the next paragraph number; AML's
+  definitions glossary rows cut by a page break (empty first cell) are
+  glued back onto their term; "APPENDICES" divider resets the path.
+- Verified: 23 unit tests built from real Docling dumps + PDF pages pass; full run
+  on all 3 PDFs with a stand-in parser had no crashes, unique ids, no
+  main-body duplicate paragraph ids. NOT yet run with real Docling on
+  the full PDFs (the cloud workspace could not download Docling's
+  models) -> first thing next session: run the pipeline locally and
+  read the report + debug files.
+- Next: `python -m app.ingestion.pipeline --doc ekyc`, review debug
+  files, then all docs; then Qdrant in docker-compose, embed
+  chunks.jsonl, upsert dense + BM25 sparse vectors.
 
 ## Phase 2 — Evaluation Framework (RAGAS)
 Status: [ ] Not started / [ ] In progress / [ ] Done

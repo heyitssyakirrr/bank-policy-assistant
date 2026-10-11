@@ -1,0 +1,4 @@
+# Everything, plus tools for tests and linting
+-r requirements-ingest.txt
+pytest
+ruff

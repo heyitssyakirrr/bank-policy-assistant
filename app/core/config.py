@@ -6,7 +6,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = ""
     cohere_api_key: str = ""
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/bankpolicy"
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/bankpolicy"
     log_level: str = "INFO"
 
 

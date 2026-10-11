@@ -1,0 +1,35 @@
+# Ingestion manifest: the human-reviewed decisions about the corpus.
+#
+# Code holds GENERIC rules (how to find a paragraph, a heading, a footnote).
+# This file holds DOCUMENT-SPECIFIC decisions a reviewer made by looking at
+# the PDFs. Adding a fourth policy document = adding an entry here, not
+# changing code.
+#
+# Page numbers are 1-based PDF page indexes (what a PDF viewer shows),
+# NOT the page numbers printed on the page.
+#
+#   skip_pages: never ingested (cover page, table of contents). These carry
+#               no policy content and their words pollute keyword search.
+#   tag_pages:  ingested, but every chunk on these pages gets the tag. The
+#               retriever filters tags out by default ("tag, don't delete"),
+#               so the decision stays reversible and measurable in Phase 2.
+
+documents:
+  - code: ekyc
+    file: pd-ekyc-apr2024.pdf
+    title: e-KYC Policy Document
+    skip_pages: [1-2]
+
+  - code: ftfc
+    file: pd-ftfc-mar24.pdf
+    title: Fair Treatment of Financial Consumers Policy Document
+    skip_pages: [1-2]
+
+  - code: amlcft
+    file: PD_AMLCFTCPF_TFS_FI_Feb2024_v2.pdf
+    title: AML/CFT/CPF and TFS for FIs Policy Document
+    skip_pages: [1-3]
+    tag_pages:
+      # Appendix 2 (CDD form for MSBs), 8a/8b (reporting templates),
+      # 9/9a/9b (annual survey templates): blank forms, not provisions.
+      form_template: [148-151, 169-181]

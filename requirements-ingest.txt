@@ -1,0 +1,5 @@
+# Offline ingestion: python -m app.ingestion.pipeline
+-r requirements.txt
+docling      # layout-aware PDF parsing (pulls in torch; large, only needed here)
+pymupdf      # fast raw-text read for the per-page coverage check
+pyyaml       # ingest_manifest.yaml

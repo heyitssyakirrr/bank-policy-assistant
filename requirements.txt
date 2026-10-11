@@ -1,3 +1,5 @@
+# Web app runtime (what the API container installs). No Docling here:
+# parsing PDFs is an offline step, see requirements-ingest.txt.
 fastapi
 uvicorn[standard]
 pydantic-settings
@@ -5,6 +7,4 @@ python-dotenv
 sqlalchemy
 psycopg[binary]
 python-multipart
-pymupdf
 google-genai
-docling
