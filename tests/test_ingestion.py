@@ -489,7 +489,7 @@ def chunks_for_spec(blocks, spec):
 def test_two_boxes_after_one_paragraph_get_distinct_keys():
     chunks, stats = chunks_for_spec(FTFC_CALLOUT, FTFC_SPEC)
     boxes = [c for c in chunks if "callout" in c.tags]
-    assert [b.section_path[-1] for b in boxes] == ["Good practices", "Poor practices 8"]
+    assert [b.section_path[-1] for b in boxes] == ["Good practices", "Poor practices"]  # footnote marker stripped
     assert len({b.chunk_key for b in boxes}) == 2 and stats["duplicate_keys"] == []
 
 

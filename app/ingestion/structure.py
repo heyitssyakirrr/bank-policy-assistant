@@ -277,7 +277,7 @@ def annotate(blocks: Iterable[Block], spec: DocumentSpec) -> list[AnnotatedBlock
         # tagged block of text. It is NOT a heading: the next paragraph must not
         # inherit "Good practices" in its section path.
         if CALLOUT_RE.match(text):
-            state.callout = text
+            state.callout = re.sub(r"\s+\d{1,3}$", "", text)  # "Good practices 8" -> drop footnote marker
             emit(Role.CALLOUT, "callout box title")
             continue
 

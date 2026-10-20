@@ -1,12 +1,15 @@
-"""Compare dense (meaning) and BM25 (exact words) search on one question.
+"""See hybrid retrieval at work on one question.
 
     python -m scripts.try_search "What must a bank do if FAR exceeds 5%?"
     python -m scripts.try_search "14A.9.6"
 
-This is a learning/debugging tool, not the app. It shows the two searches
-SEPARATELY so you can see why hybrid search exists: each one finds things
-the other misses. Step 2 fuses them (RRF); step 3 reranks the result.
-Costs one Gemini embedding call per question.
+Prints three lists:
+  DENSE  meaning-based search on its own
+  BM25   exact-word search on its own
+  FUSED  what the app actually uses: exact paragraph matches first, then RRF
+         of the two lists. Each line shows where that chunk ranked in each
+         search, e.g. [D3 B4] = #3 in dense, #4 in BM25; [D- B1] = BM25 only.
+A learning/debugging tool, not the app. Costs one Gemini embedding call.
 """
 
 import sys
@@ -15,34 +18,48 @@ from qdrant_client import QdrantClient
 
 from app.core.config import settings
 from app.db.vector_repository import SearchHit, VectorRepository
-from app.services.bm25_encoder import Bm25Encoder, tokenize
+from app.services.bm25_encoder import tokenize
 from app.services.embedding_service import embed_query
+from app.services.retrieval_service import RankedChunk, RetrievalService
 
 TOP_K = 5
 
 
-def show(title: str, hits: list[SearchHit]) -> None:
+def _snippet(payload: dict) -> str:
+    return payload["text"].replace("\n", " ")[:120] + "…"
+
+
+def show_hits(title: str, hits: list[SearchHit]) -> None:
     print(f"\n{title}")
+    for rank, hit in enumerate(hits[:TOP_K], start=1):
+        print(f"  {rank}. [{hit.score:.3f}] {hit.payload['citation']}\n       {_snippet(hit.payload)}")
     if not hits:
         print("  (no results)")
-    for rank, hit in enumerate(hits, start=1):
-        text = hit.payload["text"].replace("\n", " ")
-        print(f"  {rank}. [{hit.score:.3f}] {hit.payload['citation']}\n       {text[:140]}…")
+
+
+def show_fused(chunks: list[RankedChunk]) -> None:
+    print("\nFUSED — exact paragraph matches first, then RRF (what the reranker will receive)")
+    for rank, chunk in enumerate(chunks[:TOP_K], start=1):
+        where = "EXACT" if chunk.exact_match else f"rrf {chunk.rrf_score:.4f}"
+        ranks = f"D{chunk.dense_rank or '-'} B{chunk.sparse_rank or '-'}"
+        print(f"  {rank}. [{where}] [{ranks}] {chunk.citation}\n       {_snippet(chunk.payload)}")
 
 
 def main() -> None:
     if len(sys.argv) < 2:
         raise SystemExit(__doc__)
     question = " ".join(sys.argv[1:])
-    repo = VectorRepository(QdrantClient(url=settings.qdrant_url), settings.qdrant_collection)
+    service = RetrievalService(
+        VectorRepository(QdrantClient(url=settings.qdrant_url), settings.qdrant_collection), embed_query
+    )
+    result = service.retrieve(question)
 
     print(f"Question: {question}")
-    print(f"BM25 tokens: {tokenize(question)}")
-    show("DENSE (meaning) — cosine similarity, higher = closer", repo.search_dense(embed_query(question), TOP_K))
-    show(
-        "BM25 (exact words) — BM25 score, higher = better match",
-        repo.search_sparse(Bm25Encoder.encode_query(question), TOP_K),
-    )
+    print(f"BM25 tokens: {tokenize(question)}   paragraph refs: {result.paragraph_refs or '-'}")
+    show_hits("DENSE (meaning) — cosine similarity", result.dense)
+    show_hits("BM25 (exact words) — BM25 score", result.sparse)
+    show_fused(result.chunks)
+    print(f"\nembed {result.timings_ms['embed']:.0f} ms, search {result.timings_ms['search']:.0f} ms")
 
 
 if __name__ == "__main__":

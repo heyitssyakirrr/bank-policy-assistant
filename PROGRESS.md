@@ -6,7 +6,7 @@ files you're currently working on) so Claude can pick up exactly where
 you left off, including writing code that fits what already exists.
 
 **Last updated:** 2026-10-11
-**Current phase:** Phase 1 (in progress — ingestion DONE; indexing into Qdrant built; next: hybrid retrieval + RRF, then Cohere rerank)
+**Current phase:** Phase 1 (in progress — ingestion + indexing DONE, hybrid retrieval with RRF built; next: Cohere rerank, then generation)
 **Repo:** _(fill in your GitHub link once pushed)_
 
 ---
@@ -242,6 +242,25 @@ Notes:
   minute; indexer checks Qdrant before spending quota, and if embedding
   stops (daily quota) it indexes what is cached and reports how many are
   left; the next run sends only those.
+- 2026-10-20 Qdrant index COMPLETE (1,219 points). First searches confirmed
+  why hybrid exists: dense nailed the paraphrased onboarding question but
+  missed "14A.9.6" entirely; BM25 nailed "14A.9.6" but returned noise for
+  the paraphrase.
+- 2026-10-20 STEP 2 built — hybrid retrieval:
+  `app/services/retrieval_service.py`: dense + BM25 in ONE Qdrant round trip
+  (query_batch_points), fused with hand-written RRF (k=60, deterministic
+  tie-break), plus EXACT PARAGRAPH LOOKUP: paragraph numbers in the question
+  ("14A.9.6", "para 8.10"; not "5%"/"RM3.5") are fetched by payload filter
+  and put first (RRF alone ranked 14A.9.7 above 14A.9.6). Returns each
+  chunk's dense/BM25 rank for debugging + timings. Question words (what,
+  can, do, if...) added to BM25 stopwords (FAR table BM25 rank 4 -> 2).
+  Callout titles drop footnote markers ("Good practices 8" -> "Good
+  practices"). EMBEDDING_MODEL/EMBEDDING_DIM now in config; supports
+  gemini-embedding-2 (task prefixes, one Content per text, count check);
+  each point stores `embedding_model` and a collection refuses vectors
+  from a different model. Settings: RETRIEVAL_CANDIDATES=30, RRF_K=60.
+  `scripts/try_search.py` shows DENSE / BM25 / FUSED with [D# B#] ranks.
+  64 tests pass. Next: Step 3, Cohere rerank (needs COHERE_API_KEY).
 - Verified: 33 unit tests built from real Docling dumps + PDF pages pass; full run
   on all 3 PDFs with a stand-in parser had no crashes, unique ids, no
   main-body duplicate paragraph ids. NOT yet run with real Docling on

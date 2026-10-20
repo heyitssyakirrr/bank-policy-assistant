@@ -35,12 +35,15 @@ from dataclasses import dataclass
 TOKEN_RE = re.compile(r"\d{1,2}[a-z]?(?:\.\d{1,2})+|[a-z0-9]+(?:[-/][a-z0-9]+)*")
 PARAGRAPH_ID_RE = re.compile(r"\d{1,2}[a-z]?(?:\.\d{1,2})+")
 
-# Words too common to help ranking. Modal verbs ("shall", "may", "must") are
-# kept on purpose: in a policy they separate obligations from guidance.
+# Words too common to help ranking. Modal verbs ("shall", "may", "must",
+# "should") are kept on purpose: in a policy they separate obligations from
+# guidance. The last line is question words: a user types "what must a bank
+# do if...", but "what", "do" and "if" say nothing about WHICH paragraph.
 STOPWORDS = frozenset(
     """a an and are as at be been by for from has have in into is it its of on or that the
     their them these this those to was were which will with within such any all other than
-    under where when who whom whose also""".split()
+    under where when who whom whose also
+    what how why can could do does did if i we you your my our me us please tell explain about there here so""".split()
 )
 
 

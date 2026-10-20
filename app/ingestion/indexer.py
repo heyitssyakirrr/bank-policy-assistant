@@ -32,7 +32,7 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.db.vector_repository import StoredPoint, VectorRepository
+from app.db.vector_repository import MODEL_FIELD, StoredPoint, VectorRepository
 from app.services.bm25_encoder import Bm25Encoder
 
 logger = logging.getLogger("app.ingestion.indexer")
@@ -105,10 +105,12 @@ def index_chunks(
     cache: EmbeddingCache,
     embed_fn: EmbedFn,
     dense_size: int,
+    embedding_model: str = "",
     recreate: bool = False,
 ) -> IndexReport:
-    # 0. Fail fast: check Qdrant BEFORE spending any embedding quota.
-    repo.ensure_collection(dense_size, recreate=recreate)
+    # 0. Fail fast: check Qdrant (and that this collection belongs to this
+    #    embedding model) BEFORE spending any embedding quota.
+    repo.ensure_collection(dense_size, embedding_model=embedding_model, recreate=recreate)
 
     # 1. Embed only what the cache doesn't have (identical texts are embedded once).
     reused = sum(1 for c in chunks if c["content_hash"] in cache)
@@ -142,7 +144,7 @@ def index_chunks(
             id=c["chunk_id"],
             dense=cache[c["content_hash"]],
             sparse=bm25.encode_document(c["embed_text"]),
-            payload=c,
+            payload={**c, MODEL_FIELD: embedding_model} if embedding_model else c,
         )
         for c in ready
     )
@@ -194,6 +196,7 @@ def main() -> None:
         cache,
         embed_fn=lambda texts, on_batch: emb.embed_all(texts, "RETRIEVAL_DOCUMENT", on_batch=on_batch),
         dense_size=emb.OUTPUT_DIMENSIONALITY,
+        embedding_model=emb.EMBEDDING_MODEL,
         recreate=args.recreate,
     )
     if report.not_yet_embedded:
