@@ -6,7 +6,7 @@ files you're currently working on) so Claude can pick up exactly where
 you left off, including writing code that fits what already exists.
 
 **Last updated:** 2026-10-11
-**Current phase:** Phase 1 (in progress — ingestion + indexing DONE, hybrid retrieval with RRF built; next: Cohere rerank, then generation)
+**Current phase:** Phase 1 (in progress — ingestion, indexing, hybrid retrieval and reranking built; next: generation with citations + refusal)
 **Repo:** _(fill in your GitHub link once pushed)_
 
 ---
@@ -261,6 +261,36 @@ Notes:
   from a different model. Settings: RETRIEVAL_CANDIDATES=30, RRF_K=60.
   `scripts/try_search.py` shows DENSE / BM25 / FUSED with [D# B#] ranks.
   64 tests pass. Next: Step 3, Cohere rerank (needs COHERE_API_KEY).
+- 2026-10-20 Step 2 verified on real data: FAR table fused #2 ([D3 B2]),
+  14A.9.6 [EXACT] #1, onboarding question's BM25 noise eliminated by RRF.
+  Found: AML Part 14 repeats rules per sector (14A banking / 14B insurance
+  / 14C money services / 14D e-money), crowding the top 5 with copies.
+- 2026-10-20 STEP 3 built — reranking + final selection:
+  `rerank_service.py`: `Reranker` protocol + `CohereReranker`
+  (rerank-v4.0-pro, scores ALL candidates, own 10 calls/min limiter,
+  3 retry attempts). `selection.py` (pure functions): collapse rules
+  repeated across sectors (word-overlap >= 0.85 ignoring numbers; keeps
+  the user's sector copy: banking by default, or the sector the question
+  names; named paragraphs always win), and guarantee [EXACT] paragraphs a
+  place in the final top 5. `search_service.py`: retrieve -> rerank ->
+  select; GRACEFUL DEGRADATION: if Cohere fails, fused order is used and
+  `reranked=False` is reported. Sector tagging is declared in the manifest
+  (`sectors: {14A: banking, ...}`) and stored on chunks + Qdrant payload
+  (indexed). On the real AML corpus: 308 sector chunks, 173 are copies.
+  Settings: RERANK_MODEL, RERANK_TOP_N=5, RERANK_CALLS_PER_MINUTE=10,
+  DEFAULT_SECTOR=banking. try_search shows FUSED -> FINAL with
+  "fused #k -> #j" moves, rerank scores and collapsed copies. 81 tests.
+  Next: Step 4, generation (Gemini answer with citations + refusal).
+- 2026-10-20 Step 3 verified with real Cohere: reranker rescued deep
+  candidates (FAR: para 11 fused #8 -> #3; 14A.9.6: 14A.9.8 #25 -> #5);
+  onboarding question collapsed 12 sector copies and e-KYC 8.26 made the
+  final 5. Rerank latency ~0.9-1.3 s; embed ~0.8 s; search ~45 ms.
+  Gap found: rules that exist ONLY for another sector (14C.16.12, MSB-only)
+  were reranked #1 for a bank user. Fixed: other-sector chunks are DEMOTED
+  below chunks for the user's sector / no sector (not deleted; a sector
+  named in the question becomes preferred; [EXACT] never demoted). e-KYC's
+  MSB-only paragraphs (8.6, 8.11, 8.15) tagged via manifest
+  `sector_phrases`. 85 tests.
 - Verified: 33 unit tests built from real Docling dumps + PDF pages pass; full run
   on all 3 PDFs with a stand-in parser had no crashes, unique ids, no
   main-body duplicate paragraph ids. NOT yet run with real Docling on

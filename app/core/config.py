@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     retrieval_candidates: int = 30  # how many results EACH search (dense, BM25) returns before fusion
     rrf_k: int = 60  # RRF constant; 60 is the standard value from the original paper
 
+    # --- reranking (Cohere)
+    rerank_model: str = "rerank-v4.0-pro"  # "rerank-v4.0-fast" trades some quality for latency
+    rerank_top_n: int = 5  # chunks kept after reranking = what the LLM will read
+    rerank_calls_per_minute: int = 10  # Cohere trial key limit
+    default_sector: str = "banking"  # the users are bank staff: prefer the banking copy of repeated rules
+
     log_level: str = "INFO"
 
 

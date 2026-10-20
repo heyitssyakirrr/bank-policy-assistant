@@ -126,6 +126,7 @@ class Chunk:
     word_count: int
     content_hash: str  # changes when embed_text changes -> tells us what to re-embed
     block_indexes: list[int] = field(default_factory=list)  # provenance, for debugging
+    sector: str | None = None  # e.g. "banking" for AML Part 14A; None = applies to everyone
 
     def citation(self) -> str:
         """e.g. 'e-KYC, para 8.2 (S), p. 6' — the format the UI will show."""

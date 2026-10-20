@@ -423,6 +423,7 @@ def build_chunks(
                     word_count=count_words(text),
                     content_hash=hashlib.sha256(embed_text.encode("utf-8")).hexdigest()[:16],
                     block_indexes=[ab.block.index for ab in unit.blocks],
+                    sector=spec.sector_for(first.paragraph_id, first.section_path, first.block.full_text),
                 )
             )
     return chunks, stats

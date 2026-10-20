@@ -25,7 +25,7 @@ DENSE = "dense"
 SPARSE = "bm25"
 UPSERT_BATCH = 128
 DEFAULT_EXCLUDED_TAGS = ("form_template",)  # blank forms: indexed, but hidden from search by default
-KEYWORD_INDEXES = ("doc_code", "provision", "tags", "chunk_type", "scope", "paragraph_id")
+KEYWORD_INDEXES = ("doc_code", "provision", "tags", "chunk_type", "scope", "paragraph_id", "sector")
 MODEL_FIELD = "embedding_model"  # stored on every point: which model made its dense vector
 
 
