@@ -16,6 +16,7 @@ Sector = Literal["banking", "insurance_takaful", "money_services", "non_bank_e_m
 Obligation = Literal["must", "should_or_may", "information"]
 AnswerStatus = Literal["answered", "partially_answered", "not_covered"]
 Route = Literal["search", "lookup", "search_and_lookup", "clarify", "out_of_scope", "small_talk"]
+Mode = Literal["agentic", "traditional"]  # which graph answers: the LLM decides, or a fixed line
 
 DISCLAIMER = "Based on BNM policy documents. Not legal advice."
 DOCUMENT_TITLES: dict[str, str] = {

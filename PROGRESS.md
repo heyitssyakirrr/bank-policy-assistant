@@ -5,9 +5,9 @@
 
 **Last updated:** 2026-10-24
 **Goal:** live Streamlit demo of the agentic RAG, **Mon 26 Oct 2026**
-**Current step:** M3, Postgres memory + audit + FastAPI (autonomous build by
-Claude Code; see PROJECT_PLAN.md §10)
-**Tests:** 197 passing
+**Current step:** M4, Streamlit UI (autonomous build by Claude Code; see
+PROJECT_PLAN.md §10)
+**Tests:** 239 passing
 **Repo:** _(add your GitHub link)_
 
 ---
@@ -21,8 +21,8 @@ DONE ████████████████████  Hybrid retrie
 DONE ████████████████████  Rerank + selection: Cohere, sector collapse/demotion
 DONE ████████████████████  M1  LLM layer + traditional RAG
 DONE ████████████████████  M2  LangGraph agent
-NEXT ░░░░░░░░░░░░░░░░░░░░  M3  Postgres memory + audit + FastAPI
-     ░░░░░░░░░░░░░░░░░░░░  M4  Streamlit UI
+DONE ████████████████████  M3  Postgres memory + audit + FastAPI
+NEXT ░░░░░░░░░░░░░░░░░░░░  M4  Streamlit UI
      ░░░░░░░░░░░░░░░░░░░░  M5  Golden set + evaluation harness
      ░░░░░░░░░░░░░░░░░░░░  M6  Docker, CI, LangSmith
      ░░░░░░░░░░░░░░░░░░░░  M7–M9  Evaluation runs, fixes, docs, freeze
@@ -72,7 +72,13 @@ packaging.
   `scripts/ask.py --mode agentic --steps --follow-up`. 47 new tests: every
   §8.1 graph path. Reviewed by code-reviewer: 3 major + 8 minor findings,
   all fixed.
-- [ ] M3 Postgres checkpointer + audit tables + PII masking + FastAPI SSE
+- [x] M3 Postgres checkpointer + audit tables + PII masking + FastAPI SSE
+  (24 Oct). `app/db/` (models, session, audit repository), Alembic
+  (`alembic.ini`, `migrations/` 0001 tables + append-only triggers, 0002
+  no-TRUNCATE), `app/core/pii.py`, `app/api/` (runner, views, schemas,
+  deps, routes: chat SSE, conversations, feedback, documents, health),
+  `app/main.py` app factory with a PostgresSaver. Old echo app removed.
+  Reviewed by code-reviewer: 2 major + 7 minor findings, all fixed.
 - [ ] M4 Streamlit: Chat, Compare, Evaluation
 - [ ] M5 Golden set + evaluation harness (smoke + full)
 - [ ] **Syakir:** spot-check ≥ 10 golden-set items against the PDFs
@@ -89,7 +95,8 @@ packaging.
 |---|---|---|---|---|
 | 24 Oct ~02:10 | M1 smoke: FAR question + credit-card refusal (traditional), + 2 query embeddings | 0 | 2 | 2 |
 | 24 Oct ~02:20–02:38 | M2 smoke: the five §2 cases in agentic mode (8.10 ×3, comparison ×2, follow-up pair, para 8.2, credit card), incl. 3 retried 504s, + 9 query embeddings | 21 | 7 | 9 |
-| **24 Oct total** | | **21** | **9** | **11** |
+| 24 Oct ~02:46 | M3 smoke: 2 API requests (agentic follow-up across requests, NRIC in turn 1), incl. 1 retried 504, + 3 query embeddings | 5 | 2 | 3 |
+| **24 Oct total** | | **26** | **11** | **14** |
 
 ---
 
@@ -109,6 +116,7 @@ packaging.
 | M2 agentic follow-up: "Can a customer be onboarded without meeting face to face?" then "what about takaful operators?" | turn 2 rewritten from history, sector switched to insurance/takaful ("Applies to: insurers and takaful operators"), both answered and verified, 3 LLM calls each |
 | M2 agentic: "What does para 8.2 say?" | CLARIFY: asks which of the 3 documents; 1 LLM call, no search |
 | M2 agentic: "What's the interest rate cap on credit cards?" | OUT_OF_SCOPE refusal before any search; 1 LLM call |
+| M3 API: "Can a bank onboard customer 900101-14-5678 without meeting face to face?" then "what about money changers?" (same conversation_id) | NRIC masked in prompts, logs and `turns`; turn 2 rewritten from the Postgres checkpoint, sector → money services, cites the AML 14C copies (14C.16.1, 14C.16.10-12); 31 s (one 504 retry) and 9 s; 2 `turns` + 13 `turn_events` rows; UPDATE and TRUNCATE on the audit tables rejected |
 | Gemini latency | planner 11 s with default thinking → 3 s with `thinking_level=low`. gemini-3.1-flash-lite returned 504 DEADLINE_EXCEEDED on ~1 in 8 calls (retried); a stalled call cost up to 30 s, now 20 s |
 
 **Latency:** embed ~0.7–0.9 s · Qdrant search ~30–45 ms · rerank ~0.8–1.3 s
@@ -167,6 +175,14 @@ bank-policy-assistant/
 ---
 
 ## Decisions log (why things are the way they are)
+
+**Autonomous build, M3 (2026-10-24)**
+- See PROJECT_PLAN §5.7 "Persistence + API details". The reviewer found
+  that a client disconnect (GeneratorExit) or a failed audit write lost the
+  turn, and that `alembic check` wanted to drop LangGraph's checkpoint
+  tables; both fixed and tested.
+- `/health` is a pure `readiness()` function (Qdrant count, SELECT 1,
+  settings): it can't spend quota.
 
 **Autonomous build, M2 (2026-10-24)**
 - See PROJECT_PLAN §5.7 "Agentic graph details". Key points: the generator

@@ -447,6 +447,25 @@ Recorded here so the plan stays the source of truth:
   - failed LLM attempts count towards the call budget;
   - `out_of_scope`, `small_talk` and `clarify` answers carry
     `status="not_covered"` plus an `outcome` field the UI shows.
+- **Persistence + API details (M3):**
+  - the runner lives in `app/api/runner.py` (it builds the API's turn view);
+    the route calls `runner.start()` (PII masked, conversation created, so
+    a database error is an HTTP 503) before the SSE stream begins;
+  - checkpointer thread = `<conversation_id>:<mode>`, so the two modes never
+    share graph state; one turn at a time per thread (a second request gets
+    an error event);
+  - every turn is audited: answered, `error` (with the LLM calls spent so
+    far) or `cancelled` (the client left mid-stream, with the steps reached);
+  - `turn_events` stores the user-visible step `lines` (instead of an
+    `input_summary`) plus the node's full state update and any tool error;
+    `turns` also stores `outcome`, `sector`, `pii_masked`, `notes` and
+    `error`;
+  - append-only is enforced by Postgres triggers against UPDATE, DELETE and
+    TRUNCATE (migrations 0001, 0002); Alembic ignores LangGraph's checkpoint
+    tables, so autogenerate never proposes dropping agent memory;
+  - PII: NRIC with dashes, spaces or nothing; cards by Luhn; any other 10-20
+    digits (contiguous or in groups of 3+) as an account. Two-digit groups
+    (phone area codes, paragraph lists) and amounts are left alone.
 - **Gemini settings:** `thinking_level=low` (default thinking made the
   planner take ~11 s; low takes ~3 s) and a 20 s timeout, which Gemini uses
   as the server deadline, so a stalled call (504) fails fast and is retried.

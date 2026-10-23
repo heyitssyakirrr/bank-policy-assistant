@@ -16,3 +16,7 @@ langgraph==1.2.16
 langchain==1.4.7              # init_chat_model: provider-agnostic chat models
 langchain-core==1.7.0
 langchain-google-genai==4.4.2
+# Memory + audit (Postgres)
+langgraph-checkpoint-postgres==3.2.0
+psycopg-pool==3.3.3
+alembic==1.20.1

@@ -48,10 +48,19 @@ class Settings(BaseSettings):
     # Gemini 3 "thinking": default thinking made the planner take ~11 s; low keeps routing quality
     llm_thinking_level: Literal["minimal", "low", "medium", "high"] = "low"
     rerank_timeout_s: float = 30.0
-    max_question_chars: int = 2000  # longer input is cut: no policy question needs more
+    max_question_chars: int = 2000  # the API rejects longer questions (422); scripts cut them
+
+    # --- data files
+    chunks_path: Path = Path("app/data/processed/chunks.jsonl")  # hashed into each turn's index_version
+    raw_pdf_dir: Path = Path("app/data/raw_pdfs")  # served so citations can open the PDF at the page
+    eval_results_dir: Path = Path("evals/results")  # one folder per evaluation run, shown on the Evaluation page
 
     # --- response cache (development and evaluation only; the API never enables it)
     response_cache_path: Path = Path("app/data/interim/response_cache.sqlite")
+
+    # --- Streamlit UI: where it calls the API, and the API address the browser uses for PDF links
+    api_url: str = "http://localhost:8000"  # http://api:8000 inside Docker
+    public_api_url: str = "http://localhost:8000"
 
     log_level: str = "INFO"
 
