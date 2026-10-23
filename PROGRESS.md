@@ -1,391 +1,227 @@
-# Progress Tracker — Bank Policy Compliance Assistant
+# Progress: Bank Policy Compliance Assistant
 
-Update this after every work session. When starting a new chat, paste
-this file + PROJECT_PLAN.md + your GitHub repo link (or the specific
-files you're currently working on) so Claude can pick up exactly where
-you left off, including writing code that fits what already exists.
+> Update after every work session. To continue in a new chat, paste this file,
+> PROJECT_PLAN.md, and the files you're working on.
 
-**Last updated:** 2026-10-11
-**Current phase:** Phase 1 (in progress — ingestion, indexing, hybrid retrieval and reranking built; next: generation with citations + refusal)
-**Repo:** _(fill in your GitHub link once pushed)_
+**Last updated:** 2026-10-24
+**Goal:** live Streamlit demo of the agentic RAG, **Mon 26 Oct 2026**
+**Current step:** M1, LLM layer + traditional RAG (autonomous build by Claude
+Code; see PROJECT_PLAN.md §10)
+**Tests:** 85 passing
+**Repo:** _(add your GitHub link)_
 
 ---
 
-## Environment setup notes
-- Windows, Python 3.12, venv at `.venv`
-- Driver switch: use `psycopg[binary]` (v3), not `psycopg2-binary` — hit a
-  `ModuleNotFoundError: No module named 'psycopg'` because SQLAlchemy's
-  default Postgres dialect wants v3. `DATABASE_URL` uses the
-  `postgresql+psycopg://` prefix.
-- Docker Desktop required enabling virtualization in BIOS + WSL2 features
-  before it would start (Windows-specific hurdle, resolved)
-- Repo has no `/backend` wrapper folder — flat layout with `app/` at the
-  root, since the frontend is static files served by FastAPI, not a
-  separate app (see PROJECT_PLAN.md's "Note on layout")
+## Status at a glance
 
-## Repo structure so far
+```
+DONE ████████████████████  Ingestion: 3 PDFs → 1,219 structured chunks
+DONE ████████████████████  Indexing: Qdrant dense + BM25 sparse, embedding cache
+DONE ████████████████████  Hybrid retrieval: RRF + exact paragraph lookup
+DONE ████████████████████  Rerank + selection: Cohere, sector collapse/demotion
+NEXT ░░░░░░░░░░░░░░░░░░░░  M1  LLM layer + traditional RAG
+     ░░░░░░░░░░░░░░░░░░░░  M2  LangGraph agent
+     ░░░░░░░░░░░░░░░░░░░░  M3  Postgres memory + audit + FastAPI
+     ░░░░░░░░░░░░░░░░░░░░  M4  Streamlit UI
+     ░░░░░░░░░░░░░░░░░░░░  M5  Golden set + evaluation harness
+     ░░░░░░░░░░░░░░░░░░░░  M6  Docker, CI, LangSmith
+     ░░░░░░░░░░░░░░░░░░░░  M7–M9  Evaluation runs, fixes, docs, freeze
+```
+
+**What exists** is the *retrieval engine*: give it a question and it returns
+the 5 best paragraphs. **What's missing** is everything that uses it: the LLM
+answering, the agent deciding, memory, the API, the UI, evaluation, and
+packaging.
+
+---
+
+## Checklist (from PROJECT_PLAN.md §10)
+
+### Already built
+- [x] Ingestion pipeline (`app/ingestion/`): Docling → paragraphs, S/G, tables,
+  footnotes, callouts, sectors
+- [x] Qdrant indexing with an embedding cache and quota-safe resume
+  (`indexer.py`)
+- [x] Hybrid retrieval: dense + BM25 in one round trip, RRF k=60, exact
+  lookup (`retrieval_service.py`)
+- [x] Cohere rerank + graceful fallback (`rerank_service.py`,
+  `search_service.py`)
+- [x] Sector duplicate collapse + other-sector demotion + exact-match
+  guarantee (`selection.py`)
+- [x] `scripts/try_search.py` debugging view
+- [x] 85 unit tests
+
+### Autonomous build milestones (PROJECT_PLAN.md §10)
+- [x] Gemini limits checked (Flash-Lite 15 RPM / 500 RPD; Flash 5 RPM / 20 RPD)
+- [ ] M1 LLM layer + traditional RAG
+- [ ] M2 Agentic graph + graph-path tests
+- [ ] M3 Postgres checkpointer + audit tables + PII masking + FastAPI SSE
+- [ ] M4 Streamlit: Chat, Compare, Evaluation
+- [ ] M5 Golden set + evaluation harness (smoke + full)
+- [ ] **Syakir:** spot-check ≥ 10 golden-set items against the PDFs
+- [ ] M6 Docker (index from committed cache), `.env.example`, LangSmith, CI
+- [ ] M7 Evaluation #1 (**Syakir runs it** when Claude Code says ready) + fixes
+- [ ] M8 Docs: README, architecture, investigation, testing, demo script,
+      BUILD_REPORT, LEARNING_GUIDE
+- [ ] M9 Final evaluation (**Syakir runs it**), tag `v1.0-assessment`
+- [ ] **Syakir:** read LEARNING_GUIDE + BUILD_REPORT, make slides, rehearse
+      twice, record a backup video
+
+### Quota ledger (update after every real-API run)
+| Date/time | Run | Gemini 3.1-lite | Gemini 3.5-lite | Cohere |
+|---|---|---|---|---|
+
+---
+
+## Results so far (real data)
+
+| Query | Result |
+|---|---|
+| "What must a bank do if FAR exceeds 5%?" | para 13, the FAR table and para 11 in the final top 3. The reranker lifted para 11 from fused #8 to #3 |
+| "14A.9.6" | [EXACT] #1. Dense alone missed it entirely, which is why hybrid exists |
+| "can a customer be onboarded without meeting face to face" | Final: 14A.15.1, 14A.15.7, e-KYC 8.26, 14A.15.2, 14A.15.9. 12 sector copies collapsed; money-services-only rules demoted |
+| "what does para 8.10 say about biometric matching" | [EXACT] 8.10 #1; 8.11 (money services only) demoted |
+
+**Latency:** embed ~0.7–0.9 s · Qdrant search ~30–45 ms · rerank ~0.8–1.3 s
+
+**Ingestion quality:** e-KYC 57/57 and FTFC 120/120 main-body paragraphs
+correct. AML: 2 boundaries wrong (14A.14.1 and 14B.16.2 merged into a
+neighbour; text kept). 182/182 split-off S/G markers matched by position.
+
+---
+
+## Current repo structure
+
 ```
 bank-policy-assistant/
   app/
-    main.py
-    core/            config.py, db.py, logging.py, retry.py (empty)
-    api/routes/      chat.py (echo stub), health.py, sessions.py (empty)
-    schemas/         chat.py
-    services/        embedding_service.py (renamed from embeddings.py)
-                     retrieval/rerank/generation/chat_service.py (empty placeholders)
-    db/              models.py, chat_repository.py, vector_repository.py (empty placeholders)
-    ingestion/       OFFLINE pipeline, never imported by the API
-      models.py      Block, AnnotatedBlock, Chunk (+ enums): the contract between stages
-      parser.py      Docling -> Blocks (only file that imports Docling; JSON cache by PDF sha256)
-      structure.py   regex rules: paragraph ids, S/G, headings, section path, appendix scope
-      chunker.py     paragraph chunks, table stitching + lead-in, footnotes, size splits, stable ids
-      manifest.py    loads data/ingest_manifest.yaml
-      quality.py     per-page word coverage vs PyMuPDF (flags dropped/duplicated text)
-      debug.py       human-readable dumps per stage + report
-      pipeline.py    CLI: python -m app.ingestion.pipeline [--doc ekyc] [--reparse]
-    data/
-      raw_pdfs/                 the 3 BNM PDFs
-      ingest_manifest.yaml      reviewed per-document decisions (skip/tag pages)
-      interim/docling/          cached Docling parses (gitignored)
-      processed/chunks.jsonl    pipeline output = input of the embedding step (gitignored)
-      debug/                    *.1_blocks / *.2_structure / *.3_chunks .txt + report.txt (gitignored)
-    static/          index.html, style.css, chat.js
-  scripts/           test_embeddings.py
-  tests/             test_ingestion.py (33 tests, no models/PDFs needed)
-  requirements.txt (app) / requirements-ingest.txt (+docling, pymupdf, pyyaml) / requirements-dev.txt (+pytest, ruff)
-  pyproject.toml     pytest + ruff config
-  docker-compose.yml, Dockerfile (empty), docs/, evals/ (empty placeholders)
+    core/        config.py (pydantic-settings), logging.py, retry.py (tenacity), rate_limit.py
+    db/          vector_repository.py (only file that talks to Qdrant)
+    ingestion/   OFFLINE: models, parser (Docling), structure (rules), chunker,
+                 manifest, quality, debug, pipeline (CLI), indexer (CLI)
+    services/    bm25_encoder, embedding_service, retrieval_service,
+                 rerank_service, selection, search_service
+    data/        raw_pdfs/, ingest_manifest.yaml, interim/ (caches), processed/chunks.jsonl, debug/
+    api/, schemas/, static/, main.py   ← old Phase 0 echo app: replaced on Day 3
+  scripts/       try_search.py
+  tests/         test_ingestion, test_indexing, test_retrieval, test_rerank (85 tests)
+  docker-compose.yml  (postgres + qdrant v1.19.1)
+  requirements.txt / requirements-ingest.txt / requirements-dev.txt, pyproject.toml
 ```
 
-## Document structure findings (from reading the PDFs, 2026-10-11)
-- Paragraphs are numbered (e-KYC `8.1`; AML `14C.1`, `28.2.1`) and each
-  carries a marker: **S** = standard/obligation (must comply;
-  non-compliance may mean enforcement action), **G** = guidance.
-  Answers must distinguish "must" (S) from "should/may" (G).
-- Hierarchy: Part > numbered Section (grey bar heading) > sub-section
-  (`28.1`) > paragraph (`28.1.1`) > items `(a)` / `(i)`.
-- Printed page numbers differ from the PDF page index (e-KYC +2,
-  FTFC +1, AML +3). The header carries the printed number ("Page 6 of
-  28", "15 of 178") and our header stripping currently discards it.
-  Citations should use the printed page and keep the PDF index too.
-- Boxed callouts ("Good practices", example lists) are illustrative,
-  not binding.
-- Real tables: AML definitions glossary, AML risk-factor example tables
-  (rows split mid-cell across pages), AML Appendix 5 (CTR info), e-KYC
-  Table 1 FAR thresholds (header row NOT repeated on the continuation
-  page), FTFC Appendix 3 checklist. The `find_tables()` counts (e-KYC
-  4, FTFC 56, AML 67) overstate this; boxes and S/G layouts are
-  probably being counted.
-- Blank forms/templates (AML Appendix 2, 8a/8b, last pages): rotated
-  headers and empty grids produce junk text. Exclude or tag as
-  `form_template`.
-- Footers vary ("Issued on" vs "Amendment date"); footnotes sit at the
-  page bottom; one bilingual English/Malay customer notice (AML p.61).
-- Design consequences: chunk by numbered paragraph (sub-items stay with
-  their parent); metadata = document, printed_page, pdf_page, section
-  path, paragraph number, S/G, block_type (paragraph / table / callout /
-  form); tables become their own chunks and are stitched across pages;
-  cite as "para 8.2 (S), p.6 of 28".
-- Parser trial done (see decisions log): Docling structured items won.
-- Paragraph id shapes across all 3 PDFs: `8.1`, `10.1.1`, `14A.9.6`.
-  Numbering RESTARTS in appendices (AML Appendix 1 has its own 1.1), so
-  chunk identity = document + scope (main / Appendix N) + paragraph id.
-- Some numbered lines are titles, not provisions (`29.1 Definition and
-  Interpretation`, `4.0 Relationship-based Risk Assessment`): short, no
-  S/G, no sentence ending -> heading.
-- Wrapped cross-references ("...under paragraphs / 8.10 and 8.13 of...")
-  look like paragraph starts; real paragraphs start with a capital or "(".
-- Blank forms confirmed: AML Appendix 2 (pp.148-151), 8a/8b (169-170),
-  9/9a/9b (171-181). Appendix 5 (CTR table) is real content and stays.
-
-## Current DB schema (actual, not planned)
-Postgres + pgvector container is running and reachable (`/health` confirms
-`"database": "connected"`), but the actual schema (chunks / chat_sessions /
-messages tables from PROJECT_PLAN.md) has NOT been applied yet — no
-migration/init script has been run. This is first up in Phase 1.
-
-## Current API contract (actual, not planned)
-`POST /chat`
-Request: `{"session_id": "string | null", "message": "string"}`
-Response: `{"session_id": "string", "answer": "string", "sources": [], "grounded": true}`
-— currently just echoes the input back as `answer` (`"Echo: <message>"`),
-no retrieval or LLM call involved yet.
-
-`GET /health` → `{"status": "ok", "database": "connected"}`
+## Environment notes
+- Windows, Python 3.12, `.venv`, PowerShell. Extract zips with
+  `Expand-Archive -Path <zip> -DestinationPath . -Force` (not "Extract All",
+  which creates a subfolder).
+- Docker Desktop must be running before `docker compose up -d` (enable "start
+  at login").
+- Postgres driver: `psycopg[binary]` v3, with `DATABASE_URL` starting
+  `postgresql+psycopg://`.
+- Keys in `.env` only (never committed): `GEMINI_API_KEY`, `COHERE_API_KEY`;
+  later `LANGSMITH_API_KEY`.
+- Free-tier limits hit so far: Gemini embeddings count **each text** as a
+  request (100/min, 1,000/day), and the full index took 2 days. Cohere trial:
+  10 calls/min, 1,000 calls/month.
 
 ---
 
-## Phase 0 — Foundations: Infra, Config, Logging
-Status: [x] Done
-Notes:
-- Postgres + pgvector running via Docker Compose, `/health` confirms connectivity
-- Structured logging working: each request gets a short request ID that
-  appears on every log line for that request, plus a total duration log
-  (confirmed working: `req=d2f32588` tied "Received message" and
-  "completed" log lines together)
-- Config centralized in `core/config.py` via pydantic-settings — nothing
-  reads env vars directly elsewhere
-- `/chat` (echo stub) and `/health` working end-to-end through the real
-  static frontend, not just curl/Postman
-- Not yet done, carried into Phase 1: DB schema not applied, `retry.py`
-  not created (nothing to retry yet), `app/data/raw_pdfs/` not created
-
-## Phase 1 — RAG Core: Ingestion, Hybrid Search, Rerank
-Status: [ ] Not started / [x] In progress / [ ] Done
-Notes:
-- Real PDF filenames in `app/data/raw_pdfs/`: `pd-ekyc-apr2024.pdf`,
-  `pd-ftfc-mar24.pdf`, `PD_AMLCFTCPF_TFS_FI_Feb2024_v2.pdf`
-- (SUPERSEDED 2026-10-11, see below) `app/services/ingestion_service.py` built: `extract_pages` (PyMuPDF,
-  per-page text), `detect_header_length` + `clean_pages` (strips a
-  repeated running header/footer per document — detected generically by
-  growing a matched leading-word prefix across pages, digits normalized,
-  not hardcoded per document), `chunk_pages` (fixed-size word chunking,
-  stays within a page so citations keep an accurate page number)
-- Header stripping verified correct by eye against each PDF (page 1
-  cover pages correctly left untouched since they don't match the
-  header pattern; inner pages correctly cleaned) — see decisions log
-- (old) Default chunking: 350 words/chunk, 50-word overlap (~465-470 tokens,
-  within the typical 200-500 token production range)
-- (old word-count chunker) Final clean chunk counts: e-KYC 47, Fair Treatment 81, AML/CFT/CPF/TFS
-  193 — total 321 chunks across the corpus
-- `scripts/ingest_documents.py` (Step 1, extraction+chunking only, no
-  API calls) confirmed working end-to-end with clean sample output
-- Embeddings approach decided: `app/services/embeddings.py` using the
-  **native `google-genai` SDK**. Reason (corrected 2026-10-10): Gemini's
-  OpenAI-compatible endpoint DOES support a synchronous
-  `embeddings.create`, but its docs only list `input` and `model` —
-  no documented `dimensions` or task type. We need both:
-  `output_dimensionality=768` (pgvector indexes cap at 2000 dims, and
-  the default 3072 is too big) and `task_type` (RETRIEVAL_DOCUMENT for
-  chunks vs RETRIEVAL_QUERY for user questions). Model
-  `gemini-embedding-001`. Batches of 50 texts/call, paced to stay
-  under the free-tier 30k TPM limit (321 chunks → ~7 batches, well
-  under 100 RPM / 1,000 RPD)
-- `scripts/test_embedding.py` sanity check PASSED: 2 embeddings,
-  768 dimensions confirmed
-- Still to do: apply the DB schema (nothing is stored in Postgres
-  yet), embed all 321 chunks into pgvector, build hybrid search
-  (vector + full-text) + RRF fusion + Cohere rerank, wire into
-  `/chat`, persist chat history
-- 2026-10-11: ingestion rebuilt as `app/ingestion/` (replaces
-  `ingestion_service.py` + `scripts/ingest_documents.py`; old word-count
-  chunker and header-stripping heuristic deleted). One chunk per
-  numbered paragraph (sub-items, trailing text and page-break
-  continuations included), tables as own chunks (stitched across pages,
-  prefixed with their lead-in sentence), footnotes attached to the chunk
-  that references them, oversized units split at block boundaries
-  (max 350 words), contextual header prepended to `embed_text`,
-  deterministic UUIDv5 chunk ids (idempotent upserts later), printed
-  page numbers read from page headers for citations.
-- Layout differences handled (checked on FTFC p.11-12, AML p.9/40/132):
-  FTFC "Good practices"/"Poor practices" boxes -> separate chunks tagged
-  `callout`, tied to the paragraph above, never leaking into the next
-  paragraph's section path; AML's S/G sits in its own far-left column ->
-  a lone "S"/"G" block is carried to the next paragraph number; AML's
-  definitions glossary rows cut by a page break (empty first cell) are
-  glued back onto their term; "APPENDICES" divider resets the path.
-- 2026-10-11 first REAL Docling run (e-KYC): 341 blocks -> 112 chunks,
-  all section headings correct (Parts A-C, sections 1-12, Appendices
-  1-6), para 8.10 and the stitched FAR table exactly right. Fixed from
-  that run: footnote marker after a paragraph number ("8.22 11 ."),
-  footnotes spanning several blocks (fn 11 + its (i)/(ii)), footnote on a
-  heading ("legal person 5" -> first chunk under it), Docling reading
-  Appendix 2 para 11 (a numbered list) as a table -> converted back to a
-  paragraph, coverage report ignores manifest-skipped pages. Replayed on
-  the real blocks: 108 chunks, 0 unmatched footnotes, 0 duplicates, all
-  57 main-body paragraphs present. Known, accepted: Docling scrambles
-  the order of App. 3 para 7(g)/(h) on p.24 (text kept, order off).
-- 2026-10-11 first FULL run (all 3 PDFs, real Docling): FTFC perfect
-  (120/120 paragraphs, S/G all correct, callouts tagged); e-KYC perfect.
-  AML exposed two layout problems, both fixed:
-  (1) Docling read many AML pages as 3-column TABLES (| S | 10.3.1 | text |)
-      -> "layout tables" whose rows start with paragraph numbers are
-      unpacked back into paragraphs (sub-heading rows -> headings).
-      Missing AML paragraphs 299 -> 2.
-  (2) AML's separate S/G column comes out in unreliable reading order
-      (before OR after its paragraph) -> markers matched to the paragraph
-      on the same LINE using Docling's bounding boxes (`Block.top`);
-      reading-order queue is only the fallback. Report shows how many were
-      matched each way; the blocks dump shows y= positions.
-  Also: merged table cells no longer duplicated (parser uses cell span
-  offsets); chunk size counts real words, not markdown pipes.
-  Known, accepted: AML 14A.14.1 and 14B.16.2 are merged into a
-  neighbouring paragraph by Docling (text kept, boundary wrong).
-- 2026-10-11 INGESTION DONE. Final full run: e-KYC 108, FTFC 232, AML 879
-  -> 1,219 chunks in app/data/processed/chunks.jsonl. AML: 182 of 182
-  split-off S/G markers matched by position (0 fell back to reading
-  order); 249 layout-table rows re-read as paragraphs; only flagged pages
-  are the tagged blank forms (148-181). No duplicate keys, all chunks
-  <= 350 words. Next: Qdrant + embeddings.
-- 2026-10-11 STEP 1 of retrieval built — indexing into Qdrant:
-  docker-compose adds `qdrant/qdrant:v1.19.1` (dashboard
-  http://localhost:6333/dashboard), client pinned `qdrant-client==1.19.1`.
-  `app/ingestion/indexer.py` (`python -m app.ingestion.indexer`): reads
-  chunks.jsonl, embeds only chunks missing from the EMBEDDING CACHE
-  (app/data/interim/embeddings/<model>-<dim>.jsonl, keyed by
-  content_hash), computes BM25 sparse vectors locally, upserts all points
-  by stable chunk_id, deletes stale points -> Qdrant mirrors chunks.jsonl.
-  `app/services/bm25_encoder.py`: own tokenizer (keeps paragraph ids like
-  14a.9.6 and compounds like aml/cft/cpf + their parts, light plural
-  stemming, modal verbs kept); doc vector = BM25 TF part, Qdrant
-  `Modifier.IDF` supplies IDF. `app/db/vector_repository.py`: only file
-  that talks to Qdrant; search hides `form_template` by default.
-  `app/core/retry.py`: tenacity retry on 429/5xx for Gemini (and Cohere
-  later). `scripts/try_search.py`: dense vs BM25 side by side.
-  Tested: 12 new tests on in-memory Qdrant; full 1,219-chunk corpus
-  indexed locally with BM25 sanity queries ("14A.9.6" -> para 14A.9.6;
-  "sole proprietor legal person" -> 8.12 via its attached footnote 5).
-- 2026-10-11 first real indexer run hit Gemini 429s: the free tier counts
-  EACH TEXT in a batch as one request (limit 100/min = 2 batches of 50),
-  so the daily ~1,000 limit is per text too and 1,219 chunks may need two
-  days. Fixed: `app/core/rate_limit.py` paces by texts AND tokens per
-  minute; indexer checks Qdrant before spending quota, and if embedding
-  stops (daily quota) it indexes what is cached and reports how many are
-  left; the next run sends only those.
-- 2026-10-20 Qdrant index COMPLETE (1,219 points). First searches confirmed
-  why hybrid exists: dense nailed the paraphrased onboarding question but
-  missed "14A.9.6" entirely; BM25 nailed "14A.9.6" but returned noise for
-  the paraphrase.
-- 2026-10-20 STEP 2 built — hybrid retrieval:
-  `app/services/retrieval_service.py`: dense + BM25 in ONE Qdrant round trip
-  (query_batch_points), fused with hand-written RRF (k=60, deterministic
-  tie-break), plus EXACT PARAGRAPH LOOKUP: paragraph numbers in the question
-  ("14A.9.6", "para 8.10"; not "5%"/"RM3.5") are fetched by payload filter
-  and put first (RRF alone ranked 14A.9.7 above 14A.9.6). Returns each
-  chunk's dense/BM25 rank for debugging + timings. Question words (what,
-  can, do, if...) added to BM25 stopwords (FAR table BM25 rank 4 -> 2).
-  Callout titles drop footnote markers ("Good practices 8" -> "Good
-  practices"). EMBEDDING_MODEL/EMBEDDING_DIM now in config; supports
-  gemini-embedding-2 (task prefixes, one Content per text, count check);
-  each point stores `embedding_model` and a collection refuses vectors
-  from a different model. Settings: RETRIEVAL_CANDIDATES=30, RRF_K=60.
-  `scripts/try_search.py` shows DENSE / BM25 / FUSED with [D# B#] ranks.
-  64 tests pass. Next: Step 3, Cohere rerank (needs COHERE_API_KEY).
-- 2026-10-20 Step 2 verified on real data: FAR table fused #2 ([D3 B2]),
-  14A.9.6 [EXACT] #1, onboarding question's BM25 noise eliminated by RRF.
-  Found: AML Part 14 repeats rules per sector (14A banking / 14B insurance
-  / 14C money services / 14D e-money), crowding the top 5 with copies.
-- 2026-10-20 STEP 3 built — reranking + final selection:
-  `rerank_service.py`: `Reranker` protocol + `CohereReranker`
-  (rerank-v4.0-pro, scores ALL candidates, own 10 calls/min limiter,
-  3 retry attempts). `selection.py` (pure functions): collapse rules
-  repeated across sectors (word-overlap >= 0.85 ignoring numbers; keeps
-  the user's sector copy: banking by default, or the sector the question
-  names; named paragraphs always win), and guarantee [EXACT] paragraphs a
-  place in the final top 5. `search_service.py`: retrieve -> rerank ->
-  select; GRACEFUL DEGRADATION: if Cohere fails, fused order is used and
-  `reranked=False` is reported. Sector tagging is declared in the manifest
-  (`sectors: {14A: banking, ...}`) and stored on chunks + Qdrant payload
-  (indexed). On the real AML corpus: 308 sector chunks, 173 are copies.
-  Settings: RERANK_MODEL, RERANK_TOP_N=5, RERANK_CALLS_PER_MINUTE=10,
-  DEFAULT_SECTOR=banking. try_search shows FUSED -> FINAL with
-  "fused #k -> #j" moves, rerank scores and collapsed copies. 81 tests.
-  Next: Step 4, generation (Gemini answer with citations + refusal).
-- 2026-10-20 Step 3 verified with real Cohere: reranker rescued deep
-  candidates (FAR: para 11 fused #8 -> #3; 14A.9.6: 14A.9.8 #25 -> #5);
-  onboarding question collapsed 12 sector copies and e-KYC 8.26 made the
-  final 5. Rerank latency ~0.9-1.3 s; embed ~0.8 s; search ~45 ms.
-  Gap found: rules that exist ONLY for another sector (14C.16.12, MSB-only)
-  were reranked #1 for a bank user. Fixed: other-sector chunks are DEMOTED
-  below chunks for the user's sector / no sector (not deleted; a sector
-  named in the question becomes preferred; [EXACT] never demoted). e-KYC's
-  MSB-only paragraphs (8.6, 8.11, 8.15) tagged via manifest
-  `sector_phrases`. 85 tests.
-- Verified: 33 unit tests built from real Docling dumps + PDF pages pass; full run
-  on all 3 PDFs with a stand-in parser had no crashes, unique ids, no
-  main-body duplicate paragraph ids. NOT yet run with real Docling on
-  the full PDFs (the cloud workspace could not download Docling's
-  models) -> first thing next session: run the pipeline locally and
-  read the report + debug files.
-- Next: `python -m app.ingestion.pipeline --doc ekyc`, review debug
-  files, then all docs; then Qdrant in docker-compose, embed
-  chunks.jsonl, upsert dense + BM25 sparse vectors.
-
-## Phase 2 — Evaluation Framework (RAGAS)
-Status: [ ] Not started / [ ] In progress / [ ] Done
-Notes:
-- Planned experiment (not started): compare the current fixed-size
-  word chunking (350/50 overlap) against clause-number-aware chunking
-  — splitting on the BNM documents' own numbered clauses (e.g. "1.4",
-  "4.2") via a regex boundary like `\n\d+\.\d+\s` — since these policy
-  PDFs are already segmented into self-contained numbered rules.
-  Run both through the RAGAS question set and compare context
-  precision/recall to see whether clause-aware splitting measurably
-  improves retrieval over blind word-count splitting.
--
-
-## Phase 3 — Using History Well + History UI
-Status: [ ] Not started / [ ] In progress / [ ] Done
-Notes:
--
-
-## Phase 4 — Framework Refactor: LangGraph Agent
-Status: [ ] Not started / [ ] In progress / [ ] Done
-Notes:
--
-
-## Phase 5 — MCP Tool Integration
-Status: [ ] Not started / [ ] In progress / [ ] Done
-Notes:
--
-
-## Phase 6 — Observability: LangSmith Tracing
-Status: [ ] Not started / [ ] In progress / [ ] Done
-Notes:
--
-
-## Phase 7 — Guardrails & Hardening
-Status: [ ] Not started / [ ] In progress / [ ] Done
-Notes:
--
-
-## Phase 8 — Polish & Portfolio Packaging
-Status: [ ] Not started / [ ] In progress / [ ] Done
-Notes:
--
+## Known issues / open items
+- AML 14A.14.1 and 14B.16.2 boundaries (Docling merges them). Accepted.
+- Exact lookup ignores which document a paragraph is in ("8.2" exists in
+  several). **Fixed on Day 2** by document-aware refs from the planner.
+- `detect_sector()` keyword list is brittle. **Replaced on Day 1–2** by the
+  planner's `sector` plus the user's institution type.
+- Everything is synchronous. Fine for a demo; async is in the backlog.
+- To compare in evaluation: Qdrant server-side RRF (k=2 default) vs ours
+  (k=60); Gemini Embedding 2 vs 001.
 
 ---
 
-## Open questions / blockers
--
+## Decisions log (why things are the way they are)
 
-## Decisions made along the way
-_(e.g. "chose chunk_size=500/overlap=50 because...", "chat history kept
-in same Postgres DB as vectors, not split out")_
-- Header/footer stripping must be conditional per-page (check each
-  page's own leading words against the detected pattern before
-  stripping), not applied unconditionally — an early version blindly
-  stripped the first N words from every page, which would have eaten
-  real content on pages (like cover pages) that don't actually start
-  with the header. Verified by inspecting page 1 of each document
-  after the fix.
-- Embeddings use the native `google-genai` SDK, not the OpenAI-
-  compatible endpoint used for generation. Correct reason: the
-  compatible endpoint's embeddings call documents only `input` and
-  `model`, so we can't rely on it for `output_dimensionality` and
-  `task_type`, which retrieval quality and the pgvector index limit
-  depend on. (An earlier version of this note wrongly blamed the
-  async Batch API; synchronous embeddings do work on the compatible
-  endpoint.) Generation calls still use the OpenAI-compatible endpoint
-  as originally decided.
-- Parser: **Docling, read via its structured items (not the markdown
-  export), OCR off** (2026-10-11). Trial on e-KYC pp.8-10 and 18-25
-  vs PyMuPDF. Docling put section headers in the correct reading
-  order, kept S/G markers on the paragraph line, and labelled page
-  headers as furniture and footnotes as `footnote`. The structured
-  items kept the original list markers (`1.`..`10.`, `i.`, `(i)`) and
-  had a page number on every item; the renumbering and `&amp;` seen in
-  the markdown were export artifacts. Known gaps: tables split across
-  pages (we stitch), item labels are inconsistent (S/G paragraphs are
-  sometimes `list_item`, sometimes `text`; "A. General requirements"
-  is read as a list item), and section headers come back flat with no
-  levels. So paragraph boundaries and the section hierarchy come from
-  regex on the text, not from Docling's labels. Printed page number is
-  read from the furniture header ("Page 16 of 28") before it is dropped.
-- Vector store: **Qdrant for chunks (dense + BM25 sparse), Postgres for
-  chat sessions/messages** (2026-10-11). RRF written in Python first,
-  then compared with Qdrant's server-side fusion in Phase 2.
-- Appendices are kept; blank forms/templates are tagged
-  `form_template` via a reviewed ingest manifest and filtered at query
-  time, not deleted.
--
+**Assessment refocus (2026-10-20)**
+- Project refocused on the agentic RAG assessment (live demo 26 Oct,
+  Streamlit). Postgres chat history and Docker packaging are kept; MCP is
+  dropped.
+- **Two modes, one engine:** the traditional and agentic graphs share
+  retrieval, generation and verification, so the comparison isolates the
+  decision-making.
+- **Bounded agent (LangGraph StateGraph), not a free ReAct loop:** compliance
+  needs auditable, predictable behaviour. LLM decisions happen at the routing
+  points, and code enforces limits (≤2 review rounds, ≤3 sub-searches,
+  recursion limit). A ReAct mode is in the backlog for comparison.
+- **LLM for judgment, code for facts:** question understanding (sector,
+  documents, paragraph refs, decomposition, scope) moves to the LLM planner.
+  Ingestion rules, retrieval math, duplicate collapse and citation checks stay
+  in code because they have one correct answer.
+- **Citations by evidence ID** (`E3`), verified by code, plus the S/G
+  consistency check. The LLM never types a citation.
+- **LLM access changes to LangChain chat models** (`langchain-google-genai`)
+  instead of the OpenAI-compatible endpoint, for native structured output,
+  token metadata and automatic LangSmith tracing. This supersedes the earlier
+  generation decision. Embeddings stay on the native `google-genai` SDK.
+- **Models (revised 22 Oct after checking AI Studio limits):**
+  - `gemini-3.1-flash-lite`: planner, reviewer and evaluation judge.
+  - `gemini-3.5-flash-lite`: generator.
+  - Each is the other's fallback when its quota runs out. Separate models
+    have separate quotas: 2 × 500 calls a day.
+  - The Flash models allow only 20 calls a day, so they're rejected for the
+    agent (`gemini-3.8-flash` is used only to cross-check the judge).
+  - The 2.5 models are closed to new projects.
+  - 3.1-flash-lite shuts down in May 2027; changing it is a config edit.
+- **Provider-agnostic LLM layer (22 Oct):** each role (planner, reviewer,
+  generator, judge) is configured by one setting such as
+  `PLANNER_MODEL=google_genai:gemini-3.1-flash-lite` or
+  `deepseek:deepseek-flash`, built with LangChain's `init_chat_model`.
+  - Per-role settings: the structured-output method and the rate limit.
+  - Switching provider = change `.env` + re-run the evaluation.
+  - Embeddings are NOT switchable this way: a new embedding model means
+    re-embedding and re-indexing all chunks.
+- **Memory:** a LangGraph PostgresSaver (agent state) plus our own
+  `conversations`/`turns`/`feedback` tables (product record and audit),
+  migrated with Alembic.
+- **UI:** Streamlit, separate from the FastAPI backend (SSE streaming). The
+  old static HTML UI is retired.
+
+**Retrieval (2026-10-11 → 10-20)**
+- Qdrant for chunks (dense + BM25 sparse), Postgres for chat. RRF written in
+  Python first (k=60), to compare with Qdrant's server-side fusion later.
+- Exact paragraph lookup puts named paragraphs first. RRF alone ranked
+  14A.9.7 above 14A.9.6.
+- Question words were added to BM25 stopwords (the FAR table's BM25 rank went
+  from 4 to 2).
+- Cohere `rerank-v4.0-pro` scores all 30 candidates. If it fails, the fused
+  order is used (`reranked=False`).
+- Sector copies (AML 14A/14B/14C/14D) are collapsed at Jaccard ≥ 0.85,
+  ignoring tokens with digits; the user's sector copy is kept. Rules only for
+  other sectors are demoted, not deleted.
+- Each Qdrant point stores `embedding_model`, and a collection refuses vectors
+  from another model.
+
+**Ingestion (2026-10-11)**
+- Parser: Docling structured items, OCR off. It won the trial against PyMuPDF
+  on reading order, S/G markers and labelled furniture/footnotes. Paragraph
+  boundaries and hierarchy come from rules on the text, because Docling's
+  labels are inconsistent.
+- One chunk per numbered paragraph. Tables are their own chunks, stitched
+  across pages with their lead-in sentence. Footnotes are attached to the
+  referencing chunk. Contextual header in `embed_text`. UUIDv5 stable IDs.
+- AML layout tables are unpacked into paragraphs; S/G markers are matched by
+  bounding-box line position.
+- Appendices are kept. Blank forms are tagged `form_template` in the reviewed
+  manifest and filtered at query time ("tag, don't delete").
+- Printed page numbers come from page headers (they differ from the PDF
+  index: e-KYC +2, FTFC +1, AML +3).
+- Embeddings: `gemini-embedding-001`, 768 dimensions, task types
+  RETRIEVAL_DOCUMENT/QUERY, via the native SDK, cached by content hash.
+
+---
+
+## Session log
+- **2026-10-11:** ingestion built and verified on the real PDFs; Qdrant
+  indexer built.
+- **Between sessions:** indexing ran over two days (free-tier embedding
+  quota).
+- **2026-10-20:** index complete (1,219 points); Step 2 hybrid retrieval and
+  Step 3 rerank + selection built and verified; plan refocused on the
+  agentic RAG assessment.

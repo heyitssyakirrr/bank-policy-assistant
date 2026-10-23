@@ -1,370 +1,671 @@
-# Bank Policy Compliance Assistant — Project Plan (v2)
+# Project Plan: Bank Policy Compliance Assistant (Agentic RAG)
 
-## Context for whoever (or whichever Claude session) picks this up
-Portfolio project for an AI/ML engineer job search, built to prove real
-hands-on skill — not a tutorial follow-along. The user is a CS graduate
-with backend/data engineering experience (FastAPI, Docker, SQL, OCR
-pipelines) but no prior hands-on experience with RAG, agent frameworks,
-MCP, or evals.
-
-**"Raw" in this plan means:** the user writes the retrieval, fusion, and
-reranking logic himself instead of hiding it behind a LangChain
-retriever object — NOT "avoid real infrastructure." Real infra
-(Postgres + pgvector, Docker, structured logging) is used from day one,
-because that's how actual AI engineers build these systems. Frameworks
-(LangGraph, LlamaIndex) are introduced later (Phase 4+) once the
-mechanics are understood, specifically so the user can explain what the
-framework automates.
-
-**Product:** a chatbot web app where a bank employee asks plain-English
-questions about Malaysian banking regulation and gets a grounded, cited
-answer, instead of manually searching BNM policy PDFs.
-
-**Corpus (in `app/data/raw_pdfs/`):**
-- `ekyc_policy.pdf` — BNM e-KYC Policy (2024, 30p)
-- `fair_treatment_policy.pdf` — BNM Fair Treatment of Financial Consumers (2024, 54p)
-- `aml_cft_fi_policy.pdf` — BNM AML/CFT/CPF/TFS Policy for Financial Institutions (181p)
-
-**Stack:** FastAPI backend, plain HTML/CSS/JS frontend (served as static
-files by FastAPI — no Next.js, no build step), Postgres + pgvector for
-both vector storage and chat history, Gemini API (free tier) for
-embeddings + generation, Cohere free tier for reranking. No live
-deployment — GitHub repo + Docker Compose + demo video is the
-deliverable.
-
-**Note on layout:** the repo is flat at the root (no `/backend` wrapper
-folder) — since the frontend is just static files served by FastAPI
-rather than a separate app, there's no need for a top-level backend/
-frontend split. `app/` sits directly at the repo root.
+> **Read this first.** This file explains **what** we are building, **why**
+> each design decision was made, and **in what order** we build it.
+> [PROGRESS.md](PROGRESS.md) records what is done. **Revised 24 Oct** for the
+> autonomous Claude Code build: see §5.6, §8 and §10.
+>
+> **Deadline:** live demo on **Mon 26 Oct 2026**, using Streamlit.
+> **Plan written:** Tue 20 Oct 2026.
 
 ---
 
-## Repo structure (target — build incrementally per phase)
+## 1. The product in one paragraph
+
+Bank compliance staff ask questions in plain English about three Bank Negara
+Malaysia policy documents: **e-KYC** (30 pages), **Fair Treatment of Financial
+Consumers** (FTFC, 54 pages) and **AML/CFT/CPF & TFS** (181 pages). The
+assistant answers using only those documents. It does three things beyond
+answering:
+
+- It **cites every statement** down to the paragraph and page, for example
+  *e-KYC, para 8.4 (S), p. 6*.
+- It says clearly whether something is an obligation ("**must**", an S
+  paragraph) or guidance ("**may / should**", a G paragraph).
+- When the documents don't cover a question, it **refuses** instead of
+  guessing.
+
+It remembers the conversation, so a follow-up such as *"what about takaful
+operators?"* works. It shows **its reasoning steps** live. It also runs in two
+modes, **traditional** and **agentic**, so the difference between them can be
+demonstrated and measured.
+
+### Where each assessment requirement is answered
+
+| Assessment requirement | Where it is answered | Section |
+|---|---|---|
+| Agentic RAG that retrieves chunks correctly | LangGraph agent on top of our hybrid retrieval, measured with retrieval metrics | §4, §5, §8 |
+| Working prototype demo | Streamlit app with chat, live agent steps, citations, and a compare page | §7, Day 4 |
+| Thought process and implementation flow | Architecture and design-decision docs, plus the "why" tables in this file | §3–§6, `docs/` |
+| Investigation of agentic RAG as a whole | `docs/agentic_rag_investigation.md`: patterns, trade-offs, when not to use it | §9 |
+| Traditional vs agentic RAG | Both modes in the app, compared side by side and measured on the same test set | §2, §8 |
+| Test cases that assure quality | Unit, graph-path and API tests, plus a labelled evaluation set and metrics | §8 |
+| *Bonus:* citations | Paragraph-level citations, code checks that each citation is real, S/G consistency check | §5.4 |
+| *Bonus:* optimised retrieval | Hybrid (dense + BM25), RRF, rerank, exact lookup, sector handling, with an ablation table proving each step helps | §8.3 |
+
+Our own additional requirements: **Postgres chat history** and **Docker
+packaging**.
+
+---
+
+## 2. Traditional RAG vs agentic RAG (the core idea)
+
+**Traditional RAG** is a fixed pipeline. The code decides everything, in the
+same order, every time:
+
 ```
-app/
-  main.py                    # FastAPI app factory, mounts routers, static files
-  core/
-    config.py                 # pydantic-settings: env vars, model IDs, DB URL
-    logging.py                 # logger setup, request-id middleware, timing helper
-    db.py                       # Postgres/SQLAlchemy session management
-    retry.py                     # tenacity-based retry wrapper for external API calls
-  api/
-    routes/
-      chat.py                   # POST /chat
-      sessions.py                # GET /sessions, GET /sessions/{id}
-      health.py                   # GET /health
-  schemas/
-    chat.py                     # Pydantic request/response models (incl. structured
-                                  # Gemini output schema: answer, sources, grounded)
-  services/
-    ingestion_service.py         # PDF -> chunks -> embeddings -> pgvector (Phase 1)
-    retrieval_service.py          # vector search + full-text search + RRF fusion
-    rerank_service.py              # Cohere rerank wrapper
-    generation_service.py           # Gemini call w/ structured output
-    chat_service.py                  # orchestrates retrieve->rerank->generate,
-                                       # persists messages, builds prompt w/ history
-  db/
-    models.py                    # SQLAlchemy models: Chunk, ChatSession, Message
-    vector_repository.py          # pgvector similarity + full-text queries
-    chat_repository.py             # session/message CRUD
-  static/                       # plain HTML/CSS/JS frontend
-    index.html
-    style.css
-    chat.js
-  data/
-    raw_pdfs/                    # the 3 source PDFs go here
-scripts/
-  ingest_documents.py            # one-off script to populate pgvector from PDFs
-evals/
-  questions.json                 # hand-written eval question set (Phase 2)
-  results/                       # RAGAS run outputs, one file per pipeline config
-tests/                          # optional but good practice, add as you go
-docs/
-  architecture.md                  # simple diagram + explanation (Phase 8)
-  demo.gif
-requirements.txt
-docker-compose.yml               # postgres (with pgvector image) + app
-Dockerfile
-.env.example                     # GEMINI_API_KEY=, COHERE_API_KEY=, DATABASE_URL=, ...
-README.md
-PROJECT_PLAN.md
-PROGRESS.md
+question ──► retrieve top 5 ──► LLM writes answer ──► done
 ```
 
-## Database schema (Postgres, single DB for vectors + chat)
-```sql
--- vector storage
-CREATE EXTENSION IF NOT EXISTS vector;
+**Agentic RAG** lets the LLM **make decisions** inside the pipeline: what to
+search for, whether the results are good enough, whether to search again, and
+when to stop.
 
-CREATE TABLE chunks (
-  id SERIAL PRIMARY KEY,
-  document TEXT NOT NULL,          -- e.g. 'ekyc_policy.pdf'
-  section TEXT,                     -- e.g. '4.2 Identity Verification'
-  page INT,
-  content TEXT NOT NULL,
-  embedding VECTOR(768),            -- dimension depends on the Gemini embedding model used
-  content_tsv TSVECTOR              -- for full-text search
-);
-CREATE INDEX ON chunks USING ivfflat (embedding vector_cosine_ops);
-CREATE INDEX ON chunks USING gin (content_tsv);
-
--- chat history
-CREATE TABLE chat_sessions (
-  id UUID PRIMARY KEY,
-  title TEXT,                       -- derived from first message
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
-CREATE TABLE messages (
-  id SERIAL PRIMARY KEY,
-  session_id UUID REFERENCES chat_sessions(id),
-  role TEXT NOT NULL,               -- 'user' | 'assistant'
-  content TEXT NOT NULL,
-  sources JSONB,                     -- [{document, section}], null for user messages
-  created_at TIMESTAMPTZ DEFAULT now()
-);
+```
+question ──► LLM plans ──► search / look up (in parallel) ──► LLM reviews evidence
+                                    ▲                               │
+                                    └──── not enough? search again ─┘ (max 2 rounds)
+                                                                    │ enough
+                                                                    ▼
+                                       LLM writes cited answer ──► code verifies citations
 ```
 
-## API contract (keep stable — extend, don't break)
-`POST /chat`
+### Why our documents need it: real cases from the PDFs
 
-Request:
-```json
-{ "session_id": "uuid (client-generated, omit to start a new session)", "message": "string" }
+| Situation (real) | Traditional RAG | Agentic RAG |
+|---|---|---|
+| **Cross-references.** e-KYC 8.10 says *"as required under paragraph 8.4"*. AML 14A.15.2 says it *"shall be read together with the e-KYC policy document"*. | Retrieves 8.10 only. The answer is missing the rule it depends on. | The reviewer sees the reference and fetches 8.4, or the e-KYC rules, before answering. |
+| **Multi-part or comparison questions.** *"How do the e-KYC verification rules differ from AML's non-face-to-face rules?"* | One search mixes both topics, so the top 5 favours one document. | The planner splits it into two searches, each filtered to one document, and they run in parallel. |
+| **Follow-ups.** *"what about takaful operators?"* | Searches for those four words alone and gets junk. | Rewrites it using the chat history into a full question, and switches sector to insurance/takaful. |
+| **Ambiguous paragraph numbers.** "para 8.2" exists in **several** documents. | The exact lookup returns all of them, or the wrong one. | The planner reads the context ("the e-KYC one") and looks up the right document. If it can't tell, it asks. |
+| **Out of scope.** *"What's the interest rate cap on credit cards?"* | Retrieves the 5 "closest" chunks anyway, and the LLM may stretch them into an answer. | The planner routes it to a polite refusal before any search runs. The reviewer is a second safety net. |
+
+### What it costs (we will measure this, not just claim it)
+
+| | Traditional | Agentic |
+|---|---|---|
+| LLM calls per question | 1 | usually 3, at most 5 |
+| Latency | ~3–5 s | ~6–12 s |
+| Predictability | Same path every time | Path varies, so it must be **bounded** and **traced** |
+| Best for | Simple, single-topic questions | Multi-part, cross-referenced, follow-up and borderline questions |
+
+> **Honest conclusion we expect to show:** agentic RAG is not always better.
+> On simple questions both give the same answer, and agentic is slower and
+> costs more. It wins on hard questions. Saying this in the demo shows you
+> understand the trade-off. It is not a weakness of the project.
+
+---
+
+## 3. Design principle: the LLM for judgment, code for facts
+
+You said you don't want "regex-level" decisions, and you're right about
+**understanding questions**. Matching keywords against a list (our current
+`detect_sector`) breaks as soon as someone phrases a question differently.
+That job moves to the LLM.
+
+A senior engineer doesn't put the LLM everywhere, though. **An LLM call is
+slow, costs money, and can be wrong.** If a task has one correct answer that
+code can compute, code does it, and the code can be tested exactly. This is
+what makes an AI system trustworthy for a bank. Learn this table well,
+because interviewers ask this question.
+
+| Decision | Who decides | Why |
+|---|---|---|
+| What is the user really asking? Which documents, which sector? Does it need splitting? Is it in scope? | **LLM** (planner) | Needs language understanding: paraphrases, follow-ups, implied context |
+| Are the retrieved passages enough? What is missing? Which cross-references should be followed? | **LLM** (reviewer) | Needs reading comprehension |
+| Writing the answer and choosing citations | **LLM** (generator) | Needs synthesis |
+| Splitting PDFs into numbered paragraphs (ingestion) | **Code** (rules) | The numbering is a fixed format. The rules are verified against every paragraph (57/57, 120/120). An LLM would be slower, cost money on all 265 pages, and give results we can't verify |
+| Finding the best chunks (dense + BM25 + RRF) | **Code** + embedding model | Math over vectors. It is fast and testable |
+| Ranking chunks by relevance | **Cross-encoder model** (Cohere rerank) | A specialised model: faster and more accurate than asking a chat LLM to rank |
+| Merging repeated sector copies (14A/14B/14C/14D) | **Code** | Copies are word-for-word the same, which code can check exactly for free |
+| Is a cited paragraph actually one we retrieved? Does "must" match an S paragraph? | **Code** (verifier) | There is a correct answer. Never ask an LLM to check what code can check |
+| Loop limits (max 2 search rounds) | **Code** | Safety. An agent must never be able to loop forever |
+
+**What changes in the current code:**
+- `detect_sector()` keyword matching is **removed from the question path**.
+  The planner returns `sector`, and the user's institution type, chosen in the
+  UI, is the default.
+- Paragraph references become **document-aware**: the planner returns
+  `{document: "ekyc", paragraph_id: "8.2"}`. That fixes the known issue that
+  exact lookup ignored the document.
+- The paragraph-number regex stays **only as validation**: it checks that what
+  the LLM extracted is a real paragraph-ID shape, and the index confirms the
+  paragraph exists. This guards against the LLM hallucinating an ID.
+
+---
+
+## 4. Architecture
+
+```
+┌──────────────────────┐   HTTP + SSE stream   ┌───────────────────────────────────────────────┐
+│  Streamlit UI (ui/)  │ ────────────────────► │  FastAPI backend (app/api)                    │
+│  chat · agent steps  │ ◄──────────────────── │  POST /chat  GET /conversations  /documents   │
+│  citations · compare │   step events, answer └───────────────────┬───────────────────────────┘
+└──────────────────────┘                                           │
+                                                                   ▼
+                                   ┌───────────────────────────────────────────────┐
+                                   │  LangGraph agent (app/agent)                  │
+                                   │  understand → route → search/lookup → review  │
+                                   │  → generate → verify                          │
+                                   └─────┬───────────────┬─────────────────┬───────┘
+                         tools (code)    │               │ LLM calls       │ state per conversation
+                                         ▼               ▼                 ▼
+                    ┌─────────────────────────┐  ┌──────────────┐  ┌──────────────────────────┐
+                    │ SearchService (built)   │  │ Gemini       │  │ PostgreSQL               │
+                    │ embed → Qdrant hybrid   │  │ 3.1 lite:    │  │ • LangGraph checkpoints  │
+                    │ → RRF → Cohere rerank   │  │  plan/review │  │   (agent memory)         │
+                    │ → sector selection      │  │ 3.5 lite:    │  │ • conversations, turns,  │
+                    │ get_paragraphs (built)  │  │  answer      │  │   feedback (product/audit)│
+                    └───────────┬─────────────┘  └──────────────┘  └──────────────────────────┘
+                                ▼
+                    ┌─────────────────────────┐        LangSmith: a trace of every node and LLM call
+                    │ Qdrant: 1,219 chunks    │        Docker Compose: qdrant, postgres, api, ui
+                    │ dense 768 + BM25 sparse │
+                    └─────────────────────────┘
 ```
 
-Response (structured — this is what Gemini's JSON output mode returns,
-validated against a Pydantic schema, not parsed from free text):
-```json
-{
-  "session_id": "uuid",
-  "answer": "string",
-  "sources": [{"document": "ekyc_policy.pdf", "section": "4.2 Identity Verification"}],
-  "grounded": true,
-  "trace_id": "string (added Phase 6, null until then)"
-}
+**Why the UI is separate from the backend.** In a real bank, the Streamlit
+demo would be replaced by the bank's own portal or a Teams bot. The agent
+lives behind an API, so any front end can use it. This also keeps API keys on
+the server.
+
+### Tech stack: what we use and why
+
+| Layer | Choice | Why this one | Alternatives considered |
+|---|---|---|---|
+| Agent framework | **LangGraph** | Explicit state machine (auditable, which matters for a bank), built-in checkpointing (memory), streaming, parallel fan-out (`Send`), LangSmith tracing. The industry standard for controllable agents | Plain Python loop (would work, but we'd rebuild memory, streaming and tracing ourselves). CrewAI (multi-agent role-play, too loose for compliance). LlamaIndex workflows (fine, but less widely used) |
+| LLM access | **LangChain chat model** (`langchain-google-genai`) | Native structured output (Pydantic), token-usage metadata, automatic LangSmith traces, and the provider can be swapped in config | Raw `google-genai` SDK (we'd hand-wire tracing). The OpenAI-compatible endpoint (the old plan, now superseded) |
+| Models | **`gemini-3.1-flash-lite`** for plan/review, **`gemini-3.5-flash-lite`** for answers, each the other's fallback | The free tier gives each model its own quota: 15 RPM and 500 RPD for the two Flash-Lite models, but only 20 RPD for every Flash model. Two Lite models means two quota buckets, about 1,000 calls/day. 3.5 is the newer, better writer. Model names are config only | `gemini-3.8-flash` (20/day: about 5 agentic questions a day, too few). 2.5 models (closed to new projects since Sep 2026) |
+| Retrieval | **Built already:** Qdrant hybrid + RRF + Cohere rerank | Measured on real queries (see PROGRESS) | — |
+| Memory | **LangGraph `PostgresSaver`** + our own tables | The checkpointer is the agent's working memory. Our tables are the product's record (history list, audit, feedback) | In-memory saver (lost on restart) |
+| API | **FastAPI** + Server-Sent Events | Streams agent steps live to the UI | WebSockets (two-way, which we don't need) |
+| UI | **Streamlit** | Required by the assessment, and quick to build a good chat UI | Gradio |
+| DB migrations | **Alembic** | Schema changes are versioned like code, as real teams do | `create_all()` (no history) |
+| Tracing | **LangSmith** (free developer plan) | See every node, prompt, token count and latency. Great to show live | Langfuse (also good, self-hostable) |
+| Evaluation | Own retrieval metrics + deterministic answer checks + our own LLM judge (claim-level faithfulness) | Retrieval metrics need no LLM, so they're cheap and exact. Our answers are already claims, so one judge call per answer is enough | RAGAS (several calls per answer on a 500/day quota; kept as an optional cross-check), DeepEval |
+| Packaging | **Docker Compose** | One command starts all four services | — |
+
+---
+
+## 5. The agent in detail
+
+### 5.1 LangGraph in 60 seconds (read before Day 2)
+
+- **State** is one Python dict (a `TypedDict`) that flows through the graph:
+  the question, the plan, the evidence, the answer.
+- A **node** is a plain function: `def review_evidence(state) -> dict`. It
+  reads the state and returns **only the fields it changes**.
+- An **edge** is "after node A, go to node B". A **conditional edge** is a
+  function that looks at the state and returns the name of the next node.
+  That is where the agent's decisions become control flow.
+- A **reducer** says how a field is updated when a node returns a value.
+  `messages` uses `add_messages`, which appends instead of overwriting.
+  Evidence merges by chunk ID, so parallel searches don't overwrite each
+  other.
+- **`Send`** starts the same node several times **in parallel** with
+  different inputs (map-reduce). One search per sub-question.
+- **Compile, then `invoke` or `stream`.** `stream` emits an event after each
+  node. That is how the UI shows live steps.
+- A **checkpointer** saves the state after every step under a `thread_id`
+  (our conversation ID). The next message in the same thread starts with the
+  history already loaded. That is memory.
+- **`recursion_limit`** is a hard stop on total steps. It is our second safety
+  net after the round counter.
+
+### 5.2 The graph
+
+```
+                ┌────────────────────┐
+  user msg ───► │ understand_question│  LLM (3.1-flash-lite) → QueryPlan
+                └─────────┬──────────┘
+                          │ route_after_planning()   (conditional edge, code)
+     ┌──────────────┬─────┴─────────┬───────────────────────┐
+     ▼              ▼               ▼                       ▼
+ respond_directly  ask_clarification  lookup_paragraphs   search_policies × N   (parallel via Send)
+ (out of scope /   (vague question)   (doc-aware exact)   (hybrid + rerank + selection)
+  greeting)            │                   └──────┬──────────┘
+     │                 │                          ▼
+     │                 │               ┌────────────────────┐
+     │                 │               │  review_evidence   │  LLM (3.1-flash-lite) → EvidenceReview
+     │                 │               └─────────┬──────────┘
+     │                 │                         │ route_after_review()
+     │                 │       not enough AND round < 2 ──► follow-up searches / cross-ref lookups ──┐
+     │                 │                         │ enough (or out of rounds)                       │
+     │                 │                         ▼                                       (back to review)
+     │                 │               ┌────────────────────┐
+     │                 │               │  generate_answer   │  LLM (3.5-flash-lite) → GroundedAnswer
+     │                 │               └─────────┬──────────┘
+     │                 │                         ▼
+     │                 │               ┌────────────────────┐
+     │                 │               │  verify_answer     │  CODE: citations real? S/G consistent?
+     │                 │               └─────────┬──────────┘  fails once → regenerate with feedback
+     ▼                 ▼                         ▼
+                              END  (answer + citations + trace saved to Postgres)
 ```
 
-`GET /sessions` → list of `{id, title, created_at}` for the history sidebar
-`GET /sessions/{id}` → full message list for that session
+**The traditional mode is a graph too:** `retrieve → generate_answer →
+verify_answer`. It shares the same answer and verify nodes, so the
+comparison is fair. The **only** difference is the decision-making.
 
-## Default technical parameters (starting points — justify any change in PROGRESS.md)
-- Chunk size: ~500 tokens, 50-token overlap
-- Retrieval: top-8 candidates from each of vector search and full-text
-  search → RRF fusion → reranked to top-3 passed to the LLM
-- Embedding model: check Gemini's current embedding model ID via the API/docs
-  rather than hardcoding — note the actual one used in PROGRESS.md
-- Generation model: Gemini's current flash-tier model, same rule — verify,
-  don't assume
-- Structured output: Gemini JSON mode constrained to the response schema above
-- **Database driver: `psycopg` (v3), not `psycopg2-binary`** — SQLAlchemy's
-  default Postgres dialect expects `psycopg` v3, and it has more reliable
-  prebuilt wheels on Windows anyway. `DATABASE_URL` must use the
-  `postgresql+psycopg://` prefix, not plain `postgresql://`.
-- **LLM calls use the `openai` Python SDK pointed at Gemini's OpenAI-compatible
-  endpoint** (`base_url="https://generativelanguage.googleapis.com/v1beta/openai/"`,
-  `api_key=<GEMINI_API_KEY>`), not the native `google-generativeai` SDK. This
-  keeps every request in the standard `messages`/`role`/`content` shape —
-  the same shape LangGraph/LangChain convert to internally in Phase 4 — so
-  the raw code and the framework code stay conceptually consistent, and the
-  code would need minimal changes to swap providers later.
+### 5.3 Each node
 
-## Costs & free tiers (verified — nothing here should cost anything for this project)
-- Gemini API: free tier, rate-limited, no card required
-- Cohere Rerank: free trial key, no card, 1,000 calls/month cap, 10 req/min
-  on rerank — trial keys are labeled non-commercial/evaluation use only,
-  which is fine for a portfolio repo but worth knowing
-- Postgres + pgvector: free, open source, runs in your own Docker container
-- LangSmith: free Developer plan, 5,000 traces/month, 14-day retention, 1 seat
-- Docker, LangGraph, LangChain, LlamaIndex, RAGAS, MCP: all free/open source
+| Node | Kind | Input → output | Agentic pattern it implements |
+|---|---|---|---|
+| `understand_question` | LLM | chat history + question + document catalog → `QueryPlan` | Query rewriting, **routing**, query decomposition |
+| `route_after_planning` | code | plan → which nodes run next | Routing (Adaptive RAG) |
+| `search_policies` | tool (code) | one `SearchRequest` (query, documents, sector) → evidence | Tool use, **parallelisation** |
+| `lookup_paragraphs` | tool (code) | `ParagraphRef`s → evidence (or "not found" → falls back to search) | Tool use |
+| `review_evidence` | LLM | question + numbered evidence → `EvidenceReview` | **Corrective RAG** (grade, then re-retrieve) |
+| `route_after_review` | code | review + round count → loop or generate | Evaluator–optimiser loop, bounded |
+| `generate_answer` | LLM | question + relevant evidence → `GroundedAnswer` | Grounded generation |
+| `verify_answer` | code | answer + evidence → verified answer, or one retry | **Self-check** (Self-RAG idea, done with code) |
+| `respond_directly` / `ask_clarification` | code | plan → refusal, greeting or clarifying question | Refusal / clarification |
 
----
+### 5.4 The contracts (Pydantic schemas the LLM must fill)
 
-## Phase 0 — Foundations: Infra, Config, Logging
-**Goal:** every cross-cutting concern exists before any business logic does.
+**Structured output** means the LLM must return JSON matching a schema, and
+we receive a validated Python object, not free text we have to parse. These
+schemas are the most important design in the agent.
 
-**Tasks:**
-- `docker-compose.yml`: a Postgres service using a pgvector-enabled image
-  (e.g. `pgvector/pgvector:pg16`), plus the backend service
-- `core/config.py`: pydantic-settings loading `DATABASE_URL`,
-  `GEMINI_API_KEY`, `COHERE_API_KEY`, model IDs, from `.env`
-- `core/logging.py`: structured logger, a FastAPI middleware that
-  generates a request ID per request and injects it into every log line
-  for that request, plus a simple `@log_duration` decorator/context
-  manager for timing pipeline steps
-- `core/retry.py`: a `tenacity`-based retry decorator (exponential
-  backoff) for external API calls, used later on Gemini/Cohere calls
-- `app/main.py`: FastAPI app, mounts `static/` for the frontend, a
-  `GET /health` route that checks DB connectivity
-- Apply the DB schema above via a migration or a simple init script
-- Minimal `static/index.html` + `chat.js`: a chat box that calls a stub
-  `/chat` endpoint (echo response) — confirms the whole stack is wired
+```python
+class SearchRequest(BaseModel):
+    query: str                          # a self-contained search query
+    documents: list[DocCode] = []       # [] = all documents; e.g. ["ekyc"]
+    sector: Sector | None = None        # None = the user's own sector
 
-**Definition of done:** `docker compose up` starts Postgres + backend;
-opening `index.html` and sending a message round-trips through FastAPI
-with a request ID visible in the logs; `/health` returns OK.
+class ParagraphRef(BaseModel):
+    document: DocCode | None            # None only when the user didn't say
+    paragraph_id: str                   # "8.2", "14A.9.6"
 
----
+class QueryPlan(BaseModel):
+    route: Literal["search", "lookup", "search_and_lookup", "clarify", "out_of_scope", "small_talk"]
+    standalone_question: str            # follow-up rewritten using history
+    searches: list[SearchRequest]       # 1–3: decomposition happens here
+    paragraph_refs: list[ParagraphRef]
+    clarifying_question: str | None
+    reasoning: str                      # one sentence, shown in the UI steps
 
-## Phase 1 — RAG Core: Ingestion, Hybrid Search, Rerank
-**Goal:** real, hybrid, reranked, cited answers — built the way it's
-actually done, from the start. (This replaces the old separate Phase 1
-"raw" and Phase 2 "hybrid+rerank" — no reason to build a throwaway
-in-memory version first.)
+class EvidenceReview(BaseModel):
+    relevant_evidence: list[str]        # ["E1", "E4"]: noise is dropped before answering
+    is_sufficient: bool
+    missing_information: str | None
+    follow_up_searches: list[SearchRequest]
+    cross_references: list[ParagraphRef]  # "as required under paragraph 8.4" → fetch 8.4
 
-**Tasks:**
-- `scripts/ingest_documents.py`: extract text per PDF (PyMuPDF/pdfplumber)
-  with page/section metadata, chunk it (write the chunking logic
-  yourself), embed each chunk via Gemini, insert into the `chunks` table
-  (embedding + tsvector both populated) — run this once to populate the DB
-- `retrieval_service.py`: two hand-written SQL queries — cosine similarity
-  via pgvector, and full-text rank via `ts_rank` — then Reciprocal Rank
-  Fusion combining the two ranked lists, written by hand (no library)
-- `rerank_service.py`: send the fused top-N to Cohere's rerank API
-  (wrapped in the retry decorator from Phase 0), keep top-3
-- `generation_service.py`: build the prompt from the top-3 chunks +
-  recent chat history, call Gemini with structured JSON output matching
-  the response schema
-- `chat_service.py`: orchestrates the above, persists the user message
-  and assistant response (with sources) to `messages`, creates a
-  `chat_sessions` row on first message of a session
-- `/chat` route wired to `chat_service`
-- Log timing for each step (retrieval, rerank, generation) per request
-- Frontend: real chat UI — message bubbles, loading state while waiting,
-  citations shown under each answer, using the actual `/chat` response
+class Statement(BaseModel):
+    text: str
+    obligation: Literal["must", "should_or_may", "information"]
+    evidence_ids: list[str]             # every statement must cite ≥ 1
+    quote: str                          # exact supporting words copied from the cited evidence
+    topic: str                          # which part of a multi-part question this statement answers
 
-**Definition of done:** a real e-KYC/AML/Fair Treatment question in the
-UI returns a correct, cited answer; logs show per-step timing; the
-conversation is saved to Postgres and visible via `GET /sessions/{id}`.
+class GroundedAnswer(BaseModel):
+    status: Literal["answered", "partially_answered", "not_covered"]
+    summary: str                        # the direct answer in 1–2 sentences
+    statements: list[Statement]
+    gaps: str | None                    # what the documents don't say
+```
 
----
+**How citations work (the bonus point):**
+1. Evidence is shown to the LLM as numbered blocks: `[E3] e-KYC, para 8.4
+   (S), p. 6: <text>`. The LLM cites `E3`, a short ID. It never types a
+   paragraph number or page, so it **cannot invent a citation format**.
+2. `verify_answer` (code) checks that every `evidence_id` exists. Statements
+   with no valid citation are removed. If nothing valid remains, the status
+   becomes `not_covered`, so the user gets a refusal rather than an
+   unsupported answer.
+3. **Obligation check:** a statement marked `must` has to cite at least one
+   **S** paragraph. If it cites only G paragraphs, that is an error, and the
+   answer is regenerated once with feedback. This catches the worst
+   compliance mistake: presenting guidance as an obligation.
+4. **Quote check:** each statement carries the exact words it relies on.
+   Code checks that the quote really appears in the cited evidence (after
+   normalising spaces and case). A citation pointing at the wrong paragraph
+   fails this check.
+5. The UI maps `E3` back to the human citation, *"e-KYC Policy Document,
+   para 8.4 (S), p. 6"*, with a link that opens the PDF at that page.
 
-## Phase 2 — Evaluation Framework (RAGAS)
-**Goal:** measured quality, not vibes.
+**What `verify_answer` does, in order:**
 
-**Tasks:**
-- `evals/questions.json`: 12–15 hand-written Q&A pairs across all 3
-  documents, including 2–3 cross-document ones (e.g. KYC red flag → AML
-  process), each with expected answer and expected source
-- Install `ragas`; `evals/run_eval.py` runs the question set through the
-  live pipeline, scores faithfulness, answer relevancy, context
-  precision/recall
-- Run at least two configs (e.g. with vs. without reranking, or two
-  chunk sizes) and save both to `evals/results/`
-- Record the comparison and what changed in PROGRESS.md's decision log
+| # | Check | If it fails |
+|---|---|---|
+| 1 | Every cited ID is evidence we actually gave the model | Drop that ID (fixable) |
+| 2 | Every statement still has ≥ 1 valid ID | Drop the statement (fixable) |
+| 3 | The quote appears in one of its cited passages | Serious |
+| 4 | `must` statements cite at least one S paragraph | Serious |
+| 5 | Status agrees with content (`answered` needs statements; `not_covered` has none) | Fixable: correct the status |
+| 6 | Something valid is left | No: becomes `not_covered` (refusal) |
 
-**Definition of done:** `evals/results/` has at least two dated RAGAS
-runs with a written explanation of what changed between them.
+- Fixable problems are corrected silently and recorded in the audit log.
+- Serious problems mean one regeneration, with feedback listing the problems.
+  If they persist, the bad statements are removed and the status is
+  downgraded to `partially_answered`.
+- The full verification report is saved with the turn.
 
----
+### 5.5 Safety and bounds
 
-## Phase 3 — Using History Well + History UI
-**Goal:** history isn't just stored (Phase 1 already does that) — it's
-used correctly in the pipeline, and browsable in the UI.
-
-**Tasks:**
-- `chat_service.py`: include recent turns (last ~6) from `messages` in
-  the prompt so follow-ups resolve correctly (e.g. "what about for
-  corporate accounts?" after an e-KYC question)
-- Frontend: a sidebar listing past sessions (`GET /sessions`), click to
-  load a session's full history (`GET /sessions/{id}`) into the chat window
-- Test explicitly with a vague follow-up that only makes sense with
-  memory; confirm it resolves correctly; test reopening an old session
-
-**Definition of done:** a multi-turn conversation resolves follow-ups
-correctly; closing and reopening the browser still shows chat history
-via the sidebar.
+- **At most 2 review rounds** (counter in state) and a `recursion_limit` on
+  the graph. A cost ceiling is set before the question starts.
+- **At most 3 sub-searches** per plan (enforced in code, not just requested
+  in the prompt).
+- Evidence text goes into the prompt as **quoted data**. The system prompt
+  says instructions inside the documents or the user's message never override
+  the rules. Input length is capped.
+- **Retry policy** for live requests: Gemini and Cohere calls get **3
+  attempts**, with exponential backoff plus jitter (about 1 s, then 2 s,
+  capped at 8 s). Retries happen only on 429, 5xx and timeouts, never on 400
+  (a bad request won't fix itself). Each call has a timeout of about 30 s.
+  Malformed structured output gets **1 repair retry**. Offline indexing keeps
+  6 attempts, because it can afford to wait.
+- If an LLM call fails after retries, the system **degrades** instead of
+  crashing: a planner failure falls back to a plain search on the original
+  question, and a reranker failure falls back to fused order (already built).
+- Answers carry a short notice: *"Based on BNM policy documents. Not legal
+  advice."*
 
 ---
 
-## Phase 4 — Framework Refactor: LangGraph Agent
-**Goal:** rebuild as a proper agent graph now that the mechanics are understood.
+### 5.6 Production hardening (added 24 Oct)
+- **One rate limiter per model,** shared by every role and every parallel
+  search (15 RPM for each Lite model, 10/min for Cohere). Parallel nodes must
+  never burst past the limit.
+- **Response cache** (SQLite, keyed by model + prompt + input) for
+  development and evaluation. Re-runs are free, and the cache can never
+  answer live users: it is off in the API.
+- **PII masking (a data-protection guardrail):** MyKad/NRIC numbers
+  (`YYMMDD-PB-###G`), card numbers and account-number-like digit runs are
+  masked **as soon as the question arrives**, before it reaches Gemini,
+  LangSmith, logs or the audit tables (data minimisation). Policy questions
+  never need a customer's real number, so masking costs nothing in answer
+  quality. Regex is the right tool here, because these formats are fixed.
+  The UI tells the user when something was masked.
+- **Reproducible index:** commit `chunks.jsonl` and the embedding cache
+  (gzipped), so `docker compose up` rebuilds Qdrant with **zero** API calls on
+  any machine.
+- **Request budget:** each question has a ceiling (5 LLM calls, 6 searches,
+  60 s). Hitting it returns the best verified answer so far, with a note.
+- **Readiness:** `/health` reports Qdrant (point count), Postgres, the index
+  version, and which models are configured, without spending quota.
+- **Structured logs:** every line carries `request_id`, `conversation_id` and
+  `turn_id`, so one question can be traced across the API, the agent and the
+  database.
+- **Flash-Lite reliability:** flat schemas with `Literal` enums, a short
+  example in each prompt, a 1-repair retry, and a code sanitiser after every
+  LLM output (caps, valid IDs, known document codes).
 
-**Tasks:**
-- `agent_graph.py`: LangGraph graph with nodes `retrieve → rerank →
-  generate → grounding_check`
-- Conditional edge on `grounding_check`: if the answer isn't supported
-  by retrieved context, route to a fixed "not covered in these policies"
-  response — this becomes the real implementation of `grounded: false`
-- Replace manual history-in-prompt logic with LangGraph's state/
-  checkpointing where it genuinely simplifies things
-- `chat_service.py` now invokes the graph; document in PROGRESS.md
-  exactly what LangGraph replaced vs. what you kept hand-written
+## 6. Memory and chat history (Postgres)
 
-**Definition of done:** the app runs on a LangGraph graph; grounding/
-refusal is a graph branch, not a prompt instruction.
+There are two kinds of storage, and you should be able to explain why both
+exist:
 
----
+| | LangGraph checkpointer (`PostgresSaver`) | Our tables (SQLAlchemy + Alembic) |
+|---|---|---|
+| What it is | The agent's **working memory**: the full graph state after each step | The **product's record** |
+| Used for | Follow-up questions (`messages` history), resuming, debugging a past run | Sidebar conversation list, showing past answers, **audit trail**, feedback, analytics |
+| Format | Internal, owned by LangGraph | Our schema, queryable with SQL |
 
-## Phase 5 — MCP Tool Integration
-**Goal:** real tool-calling via MCP, matching what's already on the resume.
+**Our tables**
+- `conversations(id, user_id NULL, title, user_sector, created_at,
+  updated_at)`. `user_id` stays empty for now: there are no logins, but the
+  column is ready for SSO later.
+- `turns(id, conversation_id, mode, question, standalone_question, plan,
+  answer, verification, evidence_ids, models, prompt_version, index_version,
+  llm_calls, input_tokens, output_tokens, latency_ms, status, created_at)`:
+  one row per question.
+- `turn_events(id, turn_id, seq, node, input_summary, output, ms, error,
+  created_at)`: one row per graph step. Every search query with its filters
+  and returned chunk IDs and scores, every reviewer decision, fallbacks used,
+  and errors.
+- `feedback(turn_id, rating, comment, created_at)` records thumbs up or down
+  from the UI.
 
-**Tasks:**
-- `mcp_server.py`: minimal MCP server exposing `search_policy_document(query)`,
-  wrapping `retrieval_service`
-- Connect the LangGraph agent to it as an MCP client, replacing the
-  direct function call in the `retrieve` node with a real MCP tool call
-- Confirm end-to-end: a request triggers a real MCP tool call, result
-  flows back into the graph
+**Audit log rules:**
+- `turns` and `turn_events` are **append-only**: no updates, no deletes.
+- They record enough to answer *"why did the assistant say X on 3 March?"*:
+  the exact evidence, the models, the prompt version, and the index version
+  (a hash of `chunks.jsonl`).
 
-**Definition of done:** the retrieval step goes through MCP, confirmed
-visible in the LangSmith trace (Phase 6).
-
----
-
-## Phase 6 — Observability: LangSmith Tracing
-**Goal:** real visibility into what the agent is doing per request.
-
-**Tasks:**
-- Wire LangSmith into the LangGraph pipeline
-- Confirm a single trace shows: retrieved chunks, rerank scores, the MCP
-  tool call, and the final generation
-- Re-run the Phase 2 eval set through the traced pipeline
-- Populate `trace_id` in the `/chat` response per the API contract
-
-**Definition of done:** a LangSmith trace screenshot/link in the README
-showing one full request end-to-end.
-
----
-
-## Phase 7 — Guardrails & Hardening
-**Goal:** behavior a real bank would actually accept.
-
-**Tasks:**
-- Basic PII detection on user input (flag patterns resembling IC/account
-  numbers), redact before logging
-- Adversarial test set: out-of-scope requests ("give me investment
-  advice", "how do I get around AML checks") — confirm graceful refusal
-- Confirm the `retry.py` wrapper + logging from Phase 0 handle a Gemini/
-  Cohere API failure gracefully (clean error to frontend, no crash,
-  logged with full context)
-
-**Definition of done:** a "safety testing" section in the README listing
-adversarial cases tried and how the app handled each.
+**Long conversations:** the planner sees only the last ~6 messages (trimmed),
+which keeps prompts small and fast.
 
 ---
 
-## Phase 8 — Polish & Portfolio Packaging
-**Goal:** something you'd be proud to screen-share.
+## 7. The demo app (Streamlit)
 
-**Tasks:**
-- UI polish: streaming responses if feasible, clean loading/refusal
-  states, responsive layout
-- Confirm `docker-compose.yml` + `Dockerfile` still bring the whole app
-  up with one command (this has been true since Phase 0 — just verify
-  nothing broke)
-- `README.md`: architecture diagram, the raw-logic-on-real-infra story,
-  eval results summary, MCP + LangSmith usage, GIF of it working
-- Record a 2–3 minute demo video walking through the app and 1–2
-  architectural decisions
+**Page 1, Chat (main):**
+- Sidebar: institution type (Banking, the default; Insurance/takaful; Money
+  services; E-money; or "Not sure: show all sectors"). The sector is decided
+  in this order:
+  1. a sector named or implied in the question (the planner);
+  2. the sidebar choice;
+  3. banking.
 
-**Definition of done:** a repo a stranger could clone, run via
-`docker compose up`, and understand in 5 minutes of reading the README.
+  Each answer states the assumption it made ("Applies to: banking
+  institutions"). Also in the sidebar: mode (Agentic / Traditional),
+  conversation history (from Postgres), and a "New chat" button.
+- Each answer shows:
+  - a status badge (Answered / Partially answered / Not covered);
+  - the summary;
+  - statements with **MUST** / **MAY** badges and citation chips;
+  - a sources panel listing each citation, an S/G badge, a text snippet, and
+    an "Open PDF at page" link;
+  - 👍 / 👎 feedback.
+- **"Agent steps"**, a live expander that fills while the agent works:
+  *Understanding question → split into 2 searches → searching e-KYC… →
+  reviewing 9 passages → following cross-reference para 8.4 → writing answer →
+  citations verified ✓*. It also shows latency and LLM calls.
+
+**Page 2, Compare:** one question, with traditional and agentic answers side
+by side, plus their steps, latency and LLM calls. **This is the most
+convincing part of the demo.**
+
+**Page 3, Evaluation:** the measured results tables from `evals/results/`.
 
 ---
 
-## How to resume work in a new chat
-Share, in order: this `PROJECT_PLAN.md`, your current `PROGRESS.md`, and
-your GitHub repo link (or the specific files you're working on). That's
-enough for a fresh session to understand the architecture, current
-state, and write code that fits what already exists.
+## 8. Quality: test strategy and evaluation
+
+Quality is assured at **four levels**. This answers the "explain test case
+build" requirement.
+
+```
+            ▲   4. Evaluation set (LLM, slow, run on demand)   — "is it actually good?"
+            │   3. API tests (fake agent)                       — "does the service contract hold?"
+  cost &    │   2. Agent graph tests (scripted fake LLM)        — "does each decision path work?"
+  time      │   1. Unit tests (pure functions, no network)      — "is each piece correct?"
+```
+
+### 8.1 Automated tests (pytest, no API keys, run on every change)
+
+| Level | Examples | Status |
+|---|---|---|
+| Unit | Chunking rules, BM25 tokenizer, RRF, sector collapse, rate limiter, retries | ✅ 85 passing |
+| Unit (new) | `verify_answer`: invalid ID removed; "must" citing only G flagged; zero valid citations becomes `not_covered`. Routing functions: every route goes to the right node. Plan sanitising: more than 3 searches cut to 3; malformed paragraph ID dropped | Day 1–2 |
+| Graph paths (new) | A **scripted fake LLM** returns fixed plans and reviews, so every path runs deterministically: lookup path, parallel search, review loop stops at 2 rounds, out-of-scope refusal, clarification, cross-reference fetch, regenerate after a failed verify, planner failure falls back to plain search | Day 2 |
+| API (new) | `/chat` streams events in order; a conversation persists; feedback is saved | Day 3 |
+
+**Why a fake LLM?** Real LLM output varies, so a test against it would pass
+one day and fail the next. To test **our** logic, the routing and the loop
+bounds, we script the LLM's answers. To test **the LLM's** quality, we use the
+evaluation set below. Being able to explain this split is a strong signal in
+an interview.
+
+### 8.2 The evaluation set: `evals/golden_set.yaml` (~40 questions)
+
+| Category | # | Example | What it proves |
+|---|---|---|---|
+| Direct lookup | 4 | "What does para 14A.9.6 require?" | Exact retrieval |
+| Paraphrased single fact | 10 | "Can a customer be onboarded without meeting face to face?" | Semantic retrieval |
+| Comparison / multi-part | 6 | "Compare e-KYC and AML non-FTF verification rules" | Decomposition |
+| Cross-reference | 4 | "What does 8.10 require, including the rule it refers to?" | Following references |
+| Sector-specific | 4 | "Can a takaful operator onboard remotely?" | Sector handling |
+| Follow-up (2 turns) | 4 | "…and for money changers?" | Memory and rewriting |
+| Out of scope | 6 | "Credit card interest cap?", "Write me a poem" | Refusal |
+| Ambiguous | 2 | "What does para 8.2 say?" | Clarification |
+
+**How it is built (autonomous build, 24 Oct):**
+1. **Drafted from the chunks.** Claude Code reads `chunks.jsonl`, picks
+   paragraphs across all three documents and categories, and writes
+   questions. Each paragraph it drew from becomes the gold label.
+2. **Hard cases written by hand.** Comparisons, cross-references, follow-ups,
+   out-of-scope and ambiguous questions, written by Claude Code from the
+   actual paragraph text.
+3. **Checked twice.** Claude Code re-reads each gold paragraph to confirm it
+   really answers the question. Then **Syakir spot-checks at least 10 items**
+   against the PDFs.
+4. **Disclosed.** The report states exactly how the set was built and who
+   checked what.
+
+Three different model families keep the evaluation honest: Claude writes the
+questions, Gemini 3.5 answers them, and Gemini 3.1 judges the answers.
+
+Each item records: `id, category, question, (previous turns),
+expected_paragraphs: ["ekyc:8.4", …], answerable: true/false`.
+
+### 8.3 Metrics
+
+| Metric | Measures | Needs an LLM? |
+|---|---|---|
+| **Hit@5, Recall@5, MRR** | Did retrieval find the gold paragraphs, and how high? | No: exact and cheap |
+| **Retrieval ablation** | Dense only → BM25 only → hybrid RRF → + exact lookup → + rerank → + sector selection → agentic. Proves each optimisation (the bonus) | No (rerank calls only) |
+| **Refusal accuracy** | Refused all unanswerable questions? Answered all answerable ones? | No |
+| **Citation validity** | Cited IDs that exist (should be 100% by construction) | No |
+| **Citation recall** | Gold paragraphs that ended up cited | No |
+| **Faithfulness** (our judge) | For each statement: is it supported by its quote and cited passage? Judged per answer in one call, scored as the share of supported statements | Yes (3.1-flash-lite) |
+| **Answer relevancy** (our judge) | Does the answer address the question? 1–5 scale, in the same call | Yes |
+| **Judge agreement** | The same judgments repeated with `gemini-3.8-flash` on ~15 answers, reported as % agreement | Yes (20/day) |
+| **Cost and speed** | LLM calls, tokens, p50/p95 latency **per mode** | No |
+
+Output: `evals/results/<date>/report.md` plus JSON files, shown on the
+Evaluation page and in the slides. **These are the numbers your resume line
+will quote.**
+
+**Why our own judge instead of RAGAS (decided 24 Oct):**
+- RAGAS's faithfulness metric first extracts claims, then checks each one,
+  which costs several LLM calls per answer. Our answers already **are**
+  claims: statements, each with a quote and a citation. So one judge call per
+  answer covers it, about 3× fewer calls on a 500/day quota.
+- The judge prompt and rubric live in the repo, so they can be read and
+  explained.
+- RAGAS stays an optional cross-check on a small subset if quota allows.
+- **Resume wording:** "LLM-as-judge faithfulness", not "RAGAS".
+
+**Judge bias:** the judge is a different model from the generator, and a
+second, stronger model cross-checks a sample.
+
+---
+
+## 9. Documents to produce (for the "thought process" and "investigation" parts)
+
+| File | Contents |
+|---|---|
+| `README.md` | What it is, a screenshot, the architecture diagram, quick start (`docker compose up`), results table |
+| `docs/architecture.md` | Components, data flow from PDF to answer, the graph, the state and schemas, design decisions with reasons |
+| `docs/agentic_rag_investigation.md` | What agentic RAG is; workflows vs agents; the patterns (routing, tool use, Corrective RAG, Self-RAG, Adaptive RAG, decomposition, ReAct); trade-offs; **when NOT to use it**; our measured comparison |
+| `docs/testing_and_evaluation.md` | The test pyramid, how the golden set was built, metric definitions, results, known failure cases |
+| `docs/demo_script.md` | The exact demo questions, in order, with what each one shows |
+| `docs/BUILD_REPORT.md` | What Claude Code built, milestone by milestone: deviations from the plan and why, real inputs and outputs, test results, evaluation results with failure analysis, quota used, known limits |
+| `docs/LEARNING_GUIDE.md` | The project explained from one LLM call up to the agent, for a beginner: every concept mapped to real files, one name per concept, with "explain it" questions and answers |
+| Slides (Claude Slides) | ~10–12 slides built from the docs above |
+
+---
+
+## 10. Build schedule: autonomous build with Claude Code (24 → 26 Oct)
+
+**Updated 24 Oct.** Claude Code builds everything, in the repo, as
+milestones. Syakir approves the plan at the start, spot-checks the golden set,
+reviews the demo, then learns from `docs/LEARNING_GUIDE.md` and
+`docs/BUILD_REPORT.md`.
+
+**Every milestone runs the same loop:**
+1. Re-read the plan section for this milestone.
+2. Implement it.
+3. `ruff` + `pytest` green.
+4. A fresh-context review by the `code-reviewer` subagent, comparing the
+   code against this plan and CLAUDE.md.
+5. Fix every finding.
+6. A real-API smoke check, within the quota budget below.
+7. Update PROGRESS.md.
+8. Commit.
+
+| # | Milestone | Done when |
+|---|---|---|
+| M1 | **LLM layer + traditional RAG:** `app/llm` (provider-agnostic factory, per-model rate limiter, response cache), `app/agent/schemas.py`, `evidence.py`, `prompts.py`, `generate_answer`, `verify_answer` (6 checks + quote check), the traditional graph, `SearchService` gets document and sector parameters, `scripts/ask.py` | `ask.py --mode traditional` answers the FAR question with verified citations and refuses "credit card interest cap"; tests green |
+| M2 | **Agentic graph:** state + reducers, `understand_question`, routing with `Send`, `search_policies`, `lookup_paragraphs`, `review_evidence` loop, clarify/refuse nodes, fallbacks, request budget, fake-LLM graph-path tests | The five §2 cases behave as described, run via `ask.py --mode agentic --steps` |
+| M3 | **Persistence + API:** Postgres checkpointer, Alembic (`conversations`, `turns`, `turn_events`, `feedback`), PII masking, `/chat` SSE, `/conversations`, `/turns/{id}/feedback`, `/documents`, `/health`; old echo app removed | A follow-up works across 2 requests; audit rows written and masked; API tests green |
+| M4 | **Streamlit UI:** Chat (live steps, MUST/MAY badges, citations, open-PDF links, sector + mode sidebar, history, 👍/👎), Compare, Evaluation | Full demo flow works in the browser (Claude Code checks with Playwright screenshots) |
+| M5 | **Evaluation harness + golden set:** ~40 items (§8.2), retrieval eval + ablation, answer eval for both modes, our judge, judge cross-check, cached runs, a `--smoke` 8-question subset, report with per-category failure analysis | `python -m evals.run --smoke` works; full-run command ready |
+| M6 | **Packaging:** Dockerfile, compose (qdrant, postgres, api, ui, one-off index bootstrap from committed cache), `.env.example`, LangSmith env, GitHub Actions (ruff + pytest) | `docker compose up` from a clean clone serves the app with no embedding calls |
+| M7 | **First full evaluation** (Syakir runs it when Claude Code says it's ready), then Claude Code analyses it, fixes the top failures, and re-runs only the affected items | Report shows both modes; fixes recorded |
+| M8 | **Docs:** README, architecture, investigation, testing & evaluation, demo script, BUILD_REPORT, LEARNING_GUIDE; `docs-reviewer` subagent checks them for a beginner | Syakir can follow the LEARNING_GUIDE without needing outside help |
+| M9 | **Final evaluation** (Syakir runs it), freeze the code (tag `v1.0-assessment`), demo rehearsal checklist | Final numbers in README, BUILD_REPORT and slides |
+
+**Quota: Syakir runs the full evaluations himself.** Claude Code only runs
+small smoke checks (≤ 30 calls per milestone). When an evaluation is ready,
+it stops and tells him the command, the estimated calls, and whether to run
+now or after the 3 pm reset. Rules of thumb:
+- One full evaluation run uses about 575 Gemini calls. Both Lite models
+  together allow about 1,000 a day, and the quota resets at 3 pm Malaysia
+  time.
+- Start a full run right after a reset, so the run doesn't stop halfway.
+- On the day before the demo, keep **≥ 250 calls** unused for rehearsal and
+  the live demo.
+- Check usage on AI Studio's usage page before each run.
+
+Cohere trial: about 1,000 calls/month in total. Rerank results are cached in
+evaluation runs, and every run logs how many calls it used.
+
+**If time runs short, cut in this order:** CI → Evaluation page → judge
+cross-check → feedback buttons → history sidebar. **Never cut:** the agent,
+citation verification, the Compare page, the evaluation numbers, Docker, or
+the two learning documents.
+
+## 11. The concept ladder: what you must be able to explain
+
+Learn it bottom-up. Each level uses the one below it. Next to each level is
+where it lives in **your** code, so every answer you give in the interview
+can point to something real.
+
+| # | Concept | In this project | Say it in one breath |
+|---|---|---|---|
+| 1 | **An LLM call** | `app/llm/models.py` | "A list of messages (system, user, assistant) goes in, text comes out; tokens cost money and time; temperature controls randomness." |
+| 2 | **Structured output** | `app/agent/schemas.py` | "I give the model a schema; it returns JSON that is validated into a Pydantic object, so code can branch on it safely." |
+| 3 | **Embeddings & vector search** | `embedding_service.py`, Qdrant | "Text becomes a vector; similar meaning means nearby vectors; Qdrant finds the nearest." |
+| 4 | **Hybrid retrieval & reranking** | `retrieval_service.py`, `rerank_service.py` | "Dense finds meaning, BM25 finds exact terms like 14A.9.6; RRF merges the ranks; a cross-encoder reranks the top 30 by reading query and passage together." |
+| 5 | **RAG** | traditional graph | "Retrieve evidence, put it in the prompt, generate an answer only from it, cite it, refuse if it isn't there." |
+| 6 | **Tool use** | `search_policies`, `lookup_paragraphs` | "The model decides which function to call, with which arguments; my code executes it and returns the result." |
+| 7 | **Workflows vs agents** | the two graphs | "A workflow follows code paths I defined; an agent lets the LLM choose the path. Mine is a bounded agent: the LLM decides, code enforces limits." |
+| 8 | **Agentic patterns** | §5.3 table | "Routing, decomposition, parallel tool calls, Corrective RAG grading with re-retrieval, and a self-check: each is a node in my graph." |
+| 9 | **LangGraph** | `app/agent/graph.py` | "State, nodes, conditional edges, reducers, Send for fan-out, and a checkpointer for memory, compiled into a state machine I can stream and trace." |
+| 10 | **Memory** | `PostgresSaver` + `turns` | "A checkpointer saves state per thread, so follow-ups know the history; separate tables are the product's audit record." |
+| 11 | **Serving** | FastAPI SSE + Streamlit | "The agent runs behind an API that streams each step as an event; the UI just renders events." |
+| 12 | **Evaluation** | `evals/` | "A human-verified golden set; retrieval metrics without an LLM; LLM-as-judge for faithfulness; compared per mode, re-run after every change." |
+| 13 | **Observability & ops** | LangSmith, logs, Docker | "Every node and prompt is traced with tokens and latency; the whole stack starts with one command." |
+
+---
+
+## 12. Risks
+
+| Risk | Mitigation |
+|---|---|
+| Free-tier quota runs out during evals or the demo | Response caching for evals, rate limiter, model tiering, billing as a fallback, the demo questions tested the day before |
+| The agent loops or gets slow | Round counter + `recursion_limit` + max 3 sub-searches; latency shown in the UI |
+| The live demo fails (network, API) | Backup video; `/health` checked before going on; graceful-degradation paths |
+| The LLM invents a citation | Impossible by design: it cites evidence IDs, and code verifies them |
+| An obligation is presented as guidance, or the reverse | The S/G consistency check in `verify_answer` |
+| Not enough time | Priority labels and the cut order in §10 |
+
+## 13. After the assessment (portfolio backlog)
+
+- Async end-to-end (`ainvoke`, async Qdrant and HTTP clients) for concurrent
+  users.
+- Gemini Embedding 2 A/B test, and Qdrant server-side RRF vs our own (k=2 vs
+  60).
+- A ReAct-style free tool-calling agent as a third mode, to compare autonomy
+  levels.
+- Long-term user memory (the institution type remembered per user),
+  authentication.
+- Guardrails: PII detection in questions, rate limiting per user.
+- Deployment (Cloud Run / ECS) with a managed Postgres and Qdrant Cloud.
+- **Resume:** remove LlamaIndex unless it gets used. Replace the placeholder
+  numbers with the Day 5 results.
