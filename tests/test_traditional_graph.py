@@ -3,6 +3,7 @@
 from langgraph.checkpoint.memory import InMemorySaver
 
 from app.agent.budget import Budget
+from app.agent.checkpoint import state_serializer
 from app.agent.nodes import UNAVAILABLE_SUMMARY
 from app.agent.schemas import GroundedAnswer, Statement
 from app.agent.state import AgentContext, turn_input
@@ -86,20 +87,20 @@ def test_sector_none_means_all_sectors():
 
 
 def test_generator_down_returns_a_notice_not_an_exception():
-    llm = ScriptedLLM(generator=[LLMUnavailableError("quota")])
+    llm = ScriptedLLM(generator=[LLMUnavailableError("quota", 2)])
     state, _ = run(llm)
     assert state["answer"].summary == UNAVAILABLE_SUMMARY and state["notes"]
 
 
 def test_generator_down_on_regeneration_keeps_the_verified_part():
-    llm = ScriptedLLM(generator=[answered(GOOD, BAD_QUOTE), LLMUnavailableError("quota")])
+    llm = ScriptedLLM(generator=[answered(GOOD, BAD_QUOTE), LLMUnavailableError("quota", 2)])
     state, _ = run(llm)
     assert [s.text for s in state["answer"].statements] == [GOOD.text]
     assert state["answer"].status == "partially_answered"
 
 
 def test_second_turn_starts_fresh_but_keeps_the_conversation():
-    graph = build_traditional_graph(checkpointer=InMemorySaver())
+    graph = build_traditional_graph(checkpointer=InMemorySaver(serde=state_serializer()))
     llm = ScriptedLLM(generator=[answered(GOOD), answered(BAD_QUOTE), answered(GOOD)])
     run(llm, graph=graph)
     state, _ = run(llm, graph=graph)  # same thread: turn 2 regenerates once, like turn 1 could

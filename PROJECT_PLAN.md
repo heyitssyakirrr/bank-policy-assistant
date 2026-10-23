@@ -428,6 +428,28 @@ Recorded here so the plan stays the source of truth:
   always kept).
 - **Cached LLM results** report the calls they originally cost, so the
   budget and graph path are identical with or without the cache.
+- **Agentic graph details (M2):**
+  - the generator reads the planner's `standalone_question`, so a follow-up
+    like "what about takaful operators?" is answered as a full question;
+  - the planner's sector applies to the whole answer only when *every*
+    search names that one sector (one side of a banks-vs-takaful comparison
+    must keep the user's sector);
+  - a copy of a rule is kept when its search asked for that sector
+    explicitly (both sides of a cross-sector comparison stay cited);
+  - the review node, not the router, trims follow-ups to the budget: no new
+    round after 2 reviews, or when fewer than 2 LLM calls (a review + the
+    generator) or no time remain. A lookup needs 2 search slots (its
+    fallback search), so the 6-search ceiling always holds;
+  - a lookup miss searches the standalone question in the named documents
+    (a bare "paragraph 99.9" query matched nothing meaningful);
+  - one failing tool branch (Qdrant timeout) returns a note and no evidence;
+    the other branches' evidence still reaches the answer;
+  - failed LLM attempts count towards the call budget;
+  - `out_of_scope`, `small_talk` and `clarify` answers carry
+    `status="not_covered"` plus an `outcome` field the UI shows.
+- **Gemini settings:** `thinking_level=low` (default thinking made the
+  planner take ~11 s; low takes ~3 s) and a 20 s timeout, which Gemini uses
+  as the server deadline, so a stalled call (504) fails fast and is retried.
 
 ## 6. Memory and chat history (Postgres)
 

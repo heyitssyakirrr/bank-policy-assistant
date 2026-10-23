@@ -44,7 +44,9 @@ class Settings(BaseSettings):
     judge_fallback_model: str = "google_genai:gemini-3.5-flash-lite"
     structured_output_method: Literal["json_schema", "function_calling"] = "json_schema"
     llm_requests_per_minute: int = 15  # per model: every role using a model shares its limit
-    llm_timeout_s: float = 30.0
+    llm_timeout_s: float = 20.0  # Gemini uses it as the server deadline: a stalled call fails fast and is retried
+    # Gemini 3 "thinking": default thinking made the planner take ~11 s; low keeps routing quality
+    llm_thinking_level: Literal["minimal", "low", "medium", "high"] = "low"
     rerank_timeout_s: float = 30.0
     max_question_chars: int = 2000  # longer input is cut: no policy question needs more
 

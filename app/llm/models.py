@@ -58,9 +58,18 @@ class StructuredLLM(Protocol):
 class StructuredOutputError(Exception):
     """The model kept returning output that doesn't match the schema."""
 
+    def __init__(self, message: str, calls: int) -> None:
+        super().__init__(message)
+        self.calls = calls
+
 
 class LLMUnavailableError(Exception):
-    """Both the role's model and its fallback failed."""
+    """Both the role's model and its fallback failed. `calls` is what the
+    failed attempts cost, so the request budget still counts them."""
+
+    def __init__(self, message: str, calls: int) -> None:
+        super().__init__(message)
+        self.calls = calls
 
 
 # Errors another model can avoid (besides quota and outages, which are
@@ -76,11 +85,17 @@ def role_models(role: Role) -> tuple[str, str]:
 def build_chat_model(model: str) -> BaseChatModel:
     """ "google_genai:gemini-3.1-flash-lite" -> a LangChain chat model. Retries
     are ours (retry_live), so the SDK makes a single attempt per request."""
+    provider_options = (
+        {"thinking_config": {"thinking_level": settings.llm_thinking_level}}
+        if model.startswith("google_genai:")
+        else {}
+    )
     return init_chat_model(
         model,
         api_key=settings.gemini_api_key or None,
         timeout=settings.llm_timeout_s,
         max_retries=1,
+        **provider_options,
     )
 
 
@@ -119,6 +134,7 @@ class ChatModelClient:
     def invoke[T: BaseModel](self, role: Role, messages: Sequence[BaseMessage], schema: type[T]) -> LLMResult[T]:
         primary, fallback = self._models_for(role)
         errors: list[str] = []
+        failed_calls = 0
         for model in dict.fromkeys((primary, fallback)):  # same model twice = no fallback
             try:
                 return self._invoke_model(model, messages, schema)
@@ -127,10 +143,12 @@ class ChatModelClient:
                     raise  # a bad request or bad key won't be fixed by another model
                 logger.warning(f"{role} on {model} failed ({type(exc).__name__}: {exc}); trying fallback")
                 errors.append(f"{model}: {type(exc).__name__}")
-        raise LLMUnavailableError(f"{role}: every model failed ({'; '.join(errors)})")
+                failed_calls += getattr(exc, "calls", 1)
+        raise LLMUnavailableError(f"{role}: every model failed ({'; '.join(errors)})", failed_calls)
 
     def _invoke_model[T: BaseModel](self, model: str, messages: Sequence[BaseMessage], schema: type[T]) -> LLMResult[T]:
-        key = cache_key("llm", model, {"schema": schema.model_json_schema(), "messages": _serialise(messages)})
+        request = {"schema": schema.model_json_schema(), "messages": _serialise(messages)}
+        key = cache_key("llm", f"{model}|thinking={settings.llm_thinking_level}", request)
         if self._cache is not None and (hit := self._cache.get(key)) is not None:
             return LLMResult(schema.model_validate(hit["output"]), model, hit["calls"], *hit["tokens"], 0.0, True)
 
@@ -163,7 +181,7 @@ class ChatModelClient:
                     f"Reply again with only a valid {schema.__name__} object."
                 ),
             ]
-        raise StructuredOutputError(f"{model}: invalid {schema.__name__} after {calls} attempts")
+        raise StructuredOutputError(f"{model}: invalid {schema.__name__} after {calls} attempts", calls)
 
     @retry_live()
     def _call(self, model: str, runnable: Any, conversation: list[BaseMessage]) -> dict[str, Any]:

@@ -18,7 +18,7 @@ from app.agent.prompts import generator_messages
 from app.agent.schemas import GroundedAnswer
 from app.agent.state import AgentContext, AgentState
 from app.agent.verification import NOT_COVERED_SUMMARY, check_answer, finalize, regeneration_feedback
-from app.llm.models import LLMUnavailableError, StructuredOutputError
+from app.llm.models import LLMUnavailableError
 from app.services.search_service import SearchResult
 
 logger = logging.getLogger("app.agent")
@@ -60,11 +60,13 @@ def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
         answer = GroundedAnswer(status="not_covered", summary=NOT_COVERED_SUMMARY)
         return {"answer": answer, "generations": generations}
 
-    messages = generator_messages(state["question"], evidence, state.get("sector"), state.get("feedback"))
+    plan = state.get("plan")  # agentic: the planner's self-contained rewrite of a follow-up
+    question = plan.standalone_question if plan else state["question"]
+    messages = generator_messages(question, evidence, state.get("sector"), state.get("feedback"))
     try:
         result = runtime.context.llm.invoke("generator", messages, GroundedAnswer)
-    except (LLMUnavailableError, StructuredOutputError) as exc:
-        logger.error(f"generator failed: {type(exc).__name__}: {exc}")
+    except LLMUnavailableError as exc:
+        logger.error(f"generator failed: {exc}")
         verifications = state.get("verifications", [])
         if verifications:  # a regeneration failed: keep the verified part of the first answer
             fallback = finalize(verifications[-1])
@@ -74,7 +76,8 @@ def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
             "answer": fallback,
             "generations": generations,
             "feedback": None,
-            "notes": [f"Generator unavailable ({type(exc).__name__})."],
+            "notes": ["Generator unavailable."],
+            "llm_calls": exc.calls,
         }
     return {
         "answer": result.output,

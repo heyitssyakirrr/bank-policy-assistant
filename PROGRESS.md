@@ -5,9 +5,9 @@
 
 **Last updated:** 2026-10-24
 **Goal:** live Streamlit demo of the agentic RAG, **Mon 26 Oct 2026**
-**Current step:** M2, agentic graph (autonomous build by Claude Code; see
-PROJECT_PLAN.md §10)
-**Tests:** 150 passing
+**Current step:** M3, Postgres memory + audit + FastAPI (autonomous build by
+Claude Code; see PROJECT_PLAN.md §10)
+**Tests:** 197 passing
 **Repo:** _(add your GitHub link)_
 
 ---
@@ -20,8 +20,8 @@ DONE ████████████████████  Indexing: Qdr
 DONE ████████████████████  Hybrid retrieval: RRF + exact paragraph lookup
 DONE ████████████████████  Rerank + selection: Cohere, sector collapse/demotion
 DONE ████████████████████  M1  LLM layer + traditional RAG
-NEXT ░░░░░░░░░░░░░░░░░░░░  M2  LangGraph agent
-     ░░░░░░░░░░░░░░░░░░░░  M3  Postgres memory + audit + FastAPI
+DONE ████████████████████  M2  LangGraph agent
+NEXT ░░░░░░░░░░░░░░░░░░░░  M3  Postgres memory + audit + FastAPI
      ░░░░░░░░░░░░░░░░░░░░  M4  Streamlit UI
      ░░░░░░░░░░░░░░░░░░░░  M5  Golden set + evaluation harness
      ░░░░░░░░░░░░░░░░░░░░  M6  Docker, CI, LangSmith
@@ -62,7 +62,16 @@ packaging.
   caller-supplied sector, BM25 fallback when embedding fails, no-reranker
   fallback when no Cohere key. Reviewed by code-reviewer: 5 major + 12 minor
   findings, all fixed except the one noted in the decisions log.
-- [ ] M2 Agentic graph + graph-path tests
+- [x] M2 Agentic graph + graph-path tests (24 Oct). `app/agent/`:
+  `planning.py` (planner + plan sanitiser + fallback plan), `tools.py`
+  (`search_policies`, `lookup_paragraphs`, parallel via `Send`, failures
+  degrade), `review.py` (reviewer + sanitiser + budget trimming),
+  `routing.py`, `responses.py` (refusal, greeting, clarification),
+  `budget.py`, `graph.py`, `steps.py` (one line per step for CLI/API/UI),
+  `checkpoint.py` (registered state types for the checkpointer).
+  `scripts/ask.py --mode agentic --steps --follow-up`. 47 new tests: every
+  §8.1 graph path. Reviewed by code-reviewer: 3 major + 8 minor findings,
+  all fixed.
 - [ ] M3 Postgres checkpointer + audit tables + PII masking + FastAPI SSE
 - [ ] M4 Streamlit: Chat, Compare, Evaluation
 - [ ] M5 Golden set + evaluation harness (smoke + full)
@@ -79,6 +88,8 @@ packaging.
 | Date/time | Run | Gemini 3.1-lite | Gemini 3.5-lite | Cohere |
 |---|---|---|---|---|
 | 24 Oct ~02:10 | M1 smoke: FAR question + credit-card refusal (traditional), + 2 query embeddings | 0 | 2 | 2 |
+| 24 Oct ~02:20–02:38 | M2 smoke: the five §2 cases in agentic mode (8.10 ×3, comparison ×2, follow-up pair, para 8.2, credit card), incl. 3 retried 504s, + 9 query embeddings | 21 | 7 | 9 |
+| **24 Oct total** | | **21** | **9** | **11** |
 
 ---
 
@@ -93,6 +104,12 @@ packaging.
 | M1 traditional: "What must a bank do if FAR exceeds 5%?" | ANSWERED, 5 statements (3 MUST, 2 MAY) citing e-KYC App. 2 paras 10 (table), 11, 13; verification passed first time; 1 LLM call, 1,705 in / 606 out tokens, 6.7 s |
 | M1 traditional: "What is the interest rate cap on credit cards?" | NOT_COVERED, no statements; 1 LLM call, 5.6 s |
 | Cached re-run of the FAR question | 0.1 s, 0 API requests |
+| M2 agentic: "What does e-KYC paragraph 8.10 require?" | planner → lookup ekyc:8.10 → reviewer: "refers to 8.4" → lookup ekyc:8.4 → reviewer: enough → answered, verified. 4 LLM calls. The generator still cited only 8.10 (quality item for M7) |
+| M2 agentic: "How do the e-KYC verification rules differ from AML's non-face-to-face rules?" | split into 2 filtered searches (e-KYC, AML/CFT) in parallel; reviewer followed 14A.15.7; answered with 5 statements across both documents (8.10, App. 4 para 2, 14A.15.9, 14A.15.2, 14A.15.7). 4 LLM calls, 29 s |
+| M2 agentic follow-up: "Can a customer be onboarded without meeting face to face?" then "what about takaful operators?" | turn 2 rewritten from history, sector switched to insurance/takaful ("Applies to: insurers and takaful operators"), both answered and verified, 3 LLM calls each |
+| M2 agentic: "What does para 8.2 say?" | CLARIFY: asks which of the 3 documents; 1 LLM call, no search |
+| M2 agentic: "What's the interest rate cap on credit cards?" | OUT_OF_SCOPE refusal before any search; 1 LLM call |
+| Gemini latency | planner 11 s with default thinking → 3 s with `thinking_level=low`. gemini-3.1-flash-lite returned 504 DEADLINE_EXCEEDED on ~1 in 8 calls (retried); a stalled call cost up to 30 s, now 20 s |
 
 **Latency:** embed ~0.7–0.9 s · Qdrant search ~30–45 ms · rerank ~0.8–1.3 s
 
@@ -150,6 +167,19 @@ bank-policy-assistant/
 ---
 
 ## Decisions log (why things are the way they are)
+
+**Autonomous build, M2 (2026-10-24)**
+- See PROJECT_PLAN §5.7 "Agentic graph details". Key points: the generator
+  reads the standalone question; sector promotion only when every search
+  names one sector; explicitly requested sector copies are kept; the
+  review node trims follow-ups to rounds/calls/time; lookups need 2 search
+  slots; a lookup miss searches the question; tool failures degrade.
+- Prompts (`PROMPT_VERSION` 2026-10-24.4): an injection rule in every prompt,
+  a passages rule for the reviewer and generator only; an example in every
+  prompt; the reviewer sees the queries already run and must follow an
+  "as required under paragraph X" reference; comparisons are "answered"
+  from each side's rules (the first comparison run returned 1 statement).
+- Gemini `thinking_level=low` and a 20 s timeout (see the Results table).
 
 **Autonomous build, M1 (2026-10-24)**
 - Verifier check 4 = "a `must` statement must not cite only G". Unmarked

@@ -34,6 +34,7 @@ class Evidence(BaseModel):
     source: EvidenceSource
     query: str  # the search query or paragraph lookup that fetched it
     rerank_score: float | None = None
+    requested_sector: str | None = None  # the sector its search explicitly asked for (e.g. a comparison side)
 
 
 def passage_text(payload: dict[str, Any]) -> str:
@@ -41,7 +42,9 @@ def passage_text(payload: dict[str, Any]) -> str:
     return "\n".join([payload.get("text", ""), *footnotes]).strip()
 
 
-def to_evidence(candidates: Iterable[Candidate], source: EvidenceSource, query: str) -> list[Evidence]:
+def to_evidence(
+    candidates: Iterable[Candidate], source: EvidenceSource, query: str, requested_sector: str | None = None
+) -> list[Evidence]:
     """Unlabelled evidence from a search or lookup; `merge_evidence` labels it."""
     evidence = []
     for candidate in candidates:
@@ -60,6 +63,7 @@ def to_evidence(candidates: Iterable[Candidate], source: EvidenceSource, query: 
                 source=source,
                 query=query,
                 rerank_score=candidate.rerank_score,
+                requested_sector=requested_sector,
             )
         )
     return evidence
@@ -68,8 +72,10 @@ def to_evidence(candidates: Iterable[Candidate], source: EvidenceSource, query: 
 def _sector_copy_of_existing(new: Evidence, existing: Sequence[Evidence]) -> bool:
     """Is `new` another sector's copy of a rule already in the evidence? Each
     search collapses its own copies; this catches copies found by two
-    different searches. A paragraph the user named (a lookup) is always kept."""
-    if new.source == "lookup" or new.sector is None:
+    different searches. Kept regardless: a paragraph the user named (a
+    lookup), and a copy its search explicitly asked for (the takaful side of
+    a banks-vs-takaful comparison)."""
+    if new.source == "lookup" or new.sector is None or new.sector == new.requested_sector:
         return False
     words = rule_words(new.text)
     return any(e.sector not in (None, new.sector) and same_rule(rule_words(e.text), words) for e in existing)
