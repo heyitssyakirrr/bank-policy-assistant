@@ -4,6 +4,7 @@ hitting them and waiting on 429 errors.
 Gemini's free tier counts EVERY TEXT in a batch call as one request: one call
 with 50 texts uses 50 of the 100 requests allowed per minute. So we track
 texts and tokens per minute and sleep before a batch that would cross either.
+Used by offline indexing (batches); live calls use app/llm/rate_limit.py.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ import logging
 import time
 from collections.abc import Callable
 
-logger = logging.getLogger("app.rate_limit")
+logger = logging.getLogger("app.indexing.rate_limit")
 
 
 class MinuteRateLimiter:

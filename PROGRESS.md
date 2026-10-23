@@ -5,9 +5,9 @@
 
 **Last updated:** 2026-10-24
 **Goal:** live Streamlit demo of the agentic RAG, **Mon 26 Oct 2026**
-**Current step:** M1, LLM layer + traditional RAG (autonomous build by Claude
-Code; see PROJECT_PLAN.md §10)
-**Tests:** 85 passing
+**Current step:** M2, agentic graph (autonomous build by Claude Code; see
+PROJECT_PLAN.md §10)
+**Tests:** 150 passing
 **Repo:** _(add your GitHub link)_
 
 ---
@@ -19,8 +19,8 @@ DONE ████████████████████  Ingestion: 3 
 DONE ████████████████████  Indexing: Qdrant dense + BM25 sparse, embedding cache
 DONE ████████████████████  Hybrid retrieval: RRF + exact paragraph lookup
 DONE ████████████████████  Rerank + selection: Cohere, sector collapse/demotion
-NEXT ░░░░░░░░░░░░░░░░░░░░  M1  LLM layer + traditional RAG
-     ░░░░░░░░░░░░░░░░░░░░  M2  LangGraph agent
+DONE ████████████████████  M1  LLM layer + traditional RAG
+NEXT ░░░░░░░░░░░░░░░░░░░░  M2  LangGraph agent
      ░░░░░░░░░░░░░░░░░░░░  M3  Postgres memory + audit + FastAPI
      ░░░░░░░░░░░░░░░░░░░░  M4  Streamlit UI
      ░░░░░░░░░░░░░░░░░░░░  M5  Golden set + evaluation harness
@@ -53,7 +53,15 @@ packaging.
 
 ### Autonomous build milestones (PROJECT_PLAN.md §10)
 - [x] Gemini limits checked (Flash-Lite 15 RPM / 500 RPD; Flash 5 RPM / 20 RPD)
-- [ ] M1 LLM layer + traditional RAG
+- [x] M1 LLM layer + traditional RAG (24 Oct). `app/llm/` (one adapter
+  `ChatModelClient`: per-model sliding-window limiter, SQLite response cache,
+  live retries, 1 repair retry, fallback model), `app/agent/` (schemas,
+  evidence E-labels + merge reducer, prompts `PROMPT_VERSION`, verifier,
+  per-turn state, shared generator/verifier nodes, traditional graph),
+  `scripts/ask.py`. Search engine: document filters, document-aware lookup,
+  caller-supplied sector, BM25 fallback when embedding fails, no-reranker
+  fallback when no Cohere key. Reviewed by code-reviewer: 5 major + 12 minor
+  findings, all fixed except the one noted in the decisions log.
 - [ ] M2 Agentic graph + graph-path tests
 - [ ] M3 Postgres checkpointer + audit tables + PII masking + FastAPI SSE
 - [ ] M4 Streamlit: Chat, Compare, Evaluation
@@ -70,6 +78,7 @@ packaging.
 ### Quota ledger (update after every real-API run)
 | Date/time | Run | Gemini 3.1-lite | Gemini 3.5-lite | Cohere |
 |---|---|---|---|---|
+| 24 Oct ~02:10 | M1 smoke: FAR question + credit-card refusal (traditional), + 2 query embeddings | 0 | 2 | 2 |
 
 ---
 
@@ -81,6 +90,9 @@ packaging.
 | "14A.9.6" | [EXACT] #1. Dense alone missed it entirely, which is why hybrid exists |
 | "can a customer be onboarded without meeting face to face" | Final: 14A.15.1, 14A.15.7, e-KYC 8.26, 14A.15.2, 14A.15.9. 12 sector copies collapsed; money-services-only rules demoted |
 | "what does para 8.10 say about biometric matching" | [EXACT] 8.10 #1; 8.11 (money services only) demoted |
+| M1 traditional: "What must a bank do if FAR exceeds 5%?" | ANSWERED, 5 statements (3 MUST, 2 MAY) citing e-KYC App. 2 paras 10 (table), 11, 13; verification passed first time; 1 LLM call, 1,705 in / 606 out tokens, 6.7 s |
+| M1 traditional: "What is the interest rate cap on credit cards?" | NOT_COVERED, no statements; 1 LLM call, 5.6 s |
+| Cached re-run of the FAR question | 0.1 s, 0 API requests |
 
 **Latency:** embed ~0.7–0.9 s · Qdrant search ~30–45 ms · rerank ~0.8–1.3 s
 
@@ -138,6 +150,26 @@ bank-policy-assistant/
 ---
 
 ## Decisions log (why things are the way they are)
+
+**Autonomous build, M1 (2026-10-24)**
+- Verifier check 4 = "a `must` statement must not cite only G". Unmarked
+  appendix/table passages state obligations (e-KYC App. 2 para 13, the FAR
+  rule has `provision: null`). See PROJECT_PLAN §5.7.
+- Quote check: each `...` fragment ≥ 3 words, fragments in order (reviewer
+  showed "Board ... the ... shall" matched almost anything).
+- `finalize` rebuilds the summary from surviving statements; the model's
+  summary is unverified and could repeat a removed must-from-guidance claim.
+- Per-turn state reset via `turn_input()` + reset-capable reducers; only
+  `messages` carries over in a thread (reviewer reproduced the leak with
+  `InMemorySaver`).
+- Not changed (reviewer finding 8): cached LLM results keep reporting their
+  original call count, so the request budget and graph path are the same
+  with and without the cache; `cached` and `ChatModelClient.requests` show
+  what was actually sent.
+- Deferred to M3 (reviewer finding 14): register our Pydantic modules with
+  the checkpointer serializer when the Postgres saver is built.
+- Generation lives in `app/agent/nodes.py` with the verifier node; the pure
+  checks are `verification.check_answer`. `state.py` was needed in M1.
 
 **Assessment refocus (2026-10-20)**
 - Project refocused on the agentic RAG assessment (live demo 26 Oct,

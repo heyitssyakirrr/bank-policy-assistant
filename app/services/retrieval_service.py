@@ -22,6 +22,11 @@ Ranking is the wrong tool when the user names the thing they want. For
 "meaning"), so RRF ranks 14A.9.7 (#1 dense, #2 BM25) above it. When the
 question contains a paragraph number, we fetch that paragraph by its
 metadata and put it first. Real systems call this query routing.
+
+Paragraph numbers repeat across documents ("8.2" is in all three), so a
+reference carries its document when it is known: the agent's planner
+supplies `(document, paragraph_id)` pairs; the traditional mode finds bare
+numbers in the question with a regex, limited to the documents searched.
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ from __future__ import annotations
 import logging
 import re
 import time
+from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -41,6 +47,12 @@ logger = logging.getLogger("app.retrieval")
 
 # "8.10", "14A.9.6", "para 29.1.1"; not "5%", "3.5%", "RM3.5" or a version like "1.2.3.4.5"
 PARAGRAPH_REF_RE = re.compile(r"(?<![\w.])(\d{1,2}[A-Za-z]?(?:\.\d{1,2}){1,3})(?![\w.%])")
+
+
+@dataclass(frozen=True, slots=True)
+class ParagraphLookup:
+    document: str | None  # doc_code; None = any document being searched
+    paragraph_id: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,8 +75,9 @@ class RetrievalResult:
     chunks: list[RankedChunk]  # final order: exact matches first, then RRF
     dense: list[SearchHit]  # raw lists, kept for debugging and evaluation
     sparse: list[SearchHit]
-    paragraph_refs: list[str]
+    paragraph_refs: list[ParagraphLookup]
     timings_ms: dict[str, float]
+    dense_used: bool = True  # False = the query embedding failed: BM25 + exact lookup only
 
 
 def find_paragraph_refs(question: str) -> list[str]:
@@ -101,34 +114,66 @@ class RetrievalService:
         self._rrf_k = rrf_k
 
     def retrieve(
-        self, question: str, limit: int | None = None, exclude_tags: Sequence[str] = DEFAULT_EXCLUDED_TAGS
+        self,
+        question: str,
+        limit: int | None = None,
+        exclude_tags: Sequence[str] = DEFAULT_EXCLUDED_TAGS,
+        documents: Sequence[str] = (),
+        paragraph_refs: Sequence[ParagraphLookup] | None = None,
     ) -> RetrievalResult:
+        """`documents` limits every search ([] = all). `paragraph_refs=None`
+        finds paragraph numbers in the question; pass [] to skip the lookup."""
         limit = limit or self._candidates
         timings: dict[str, float] = {}
 
         # 1. Exact paragraph lookup (cheap metadata filter, no ranking involved).
-        refs = find_paragraph_refs(question)
-        exact = self._repo.get_by_paragraph_ids(refs, exclude_tags) if refs else []
+        refs = (
+            [ParagraphLookup(None, ref) for ref in find_paragraph_refs(question)]
+            if paragraph_refs is None
+            else list(paragraph_refs)
+        )
+        exact = self.lookup(refs, documents, exclude_tags)
 
         # 2. Encode the question both ways. Dense needs a Gemini call; BM25 is local.
         started = time.perf_counter()
-        dense_vector = self._embed_query(question)
+        try:
+            dense_vector: list[float] | None = self._embed_query(question)
+        except Exception as exc:  # degrade to BM25 + exact lookup rather than fail the question
+            logger.warning(f"Query embedding failed ({type(exc).__name__}: {exc}); BM25 only")
+            dense_vector = None
         timings["embed"] = (time.perf_counter() - started) * 1000
         sparse_vector = Bm25Encoder.encode_query(question)
 
         # 3. Both searches in one Qdrant round trip.
         started = time.perf_counter()
-        dense, sparse = self._repo.search_hybrid(dense_vector, sparse_vector, self._candidates, exclude_tags)
+        dense, sparse = self._repo.search_hybrid(dense_vector, sparse_vector, self._candidates, exclude_tags, documents)
         timings["search"] = (time.perf_counter() - started) * 1000
 
         # 4. Fuse, then put exact matches on top.
         chunks = self._combine(exact, dense, sparse, limit)
         logger.info(
             f"retrieve: {len(dense)} dense + {len(sparse)} bm25 -> {len(chunks)} fused"
-            f"{f' ({len(exact)} exact for {refs})' if refs else ''}"
+            f"{f' ({len(exact)} exact for {[r.paragraph_id for r in refs]})' if refs else ''}"
             f" | embed {timings['embed']:.0f}ms, search {timings['search']:.0f}ms"
         )
-        return RetrievalResult(question, chunks, dense, sparse, refs, timings)
+        return RetrievalResult(question, chunks, dense, sparse, refs, timings, dense_used=dense_vector is not None)
+
+    def lookup(
+        self,
+        refs: Sequence[ParagraphLookup],
+        documents: Sequence[str] = (),
+        exclude_tags: Sequence[str] = DEFAULT_EXCLUDED_TAGS,
+    ) -> list[SearchHit]:
+        """Fetch named paragraphs. A reference without a document is looked up
+        in `documents` (all documents if empty). One Qdrant call per document."""
+        by_document: dict[str | None, list[str]] = defaultdict(list)
+        for ref in refs:
+            by_document[ref.document].append(ref.paragraph_id.upper())
+        hits: list[SearchHit] = []
+        for document, ids in by_document.items():
+            scope = [document] if document else list(documents)
+            hits += self._repo.get_by_paragraph_ids(list(dict.fromkeys(ids)), exclude_tags, documents=scope)
+        return hits
 
     def _combine(
         self, exact: list[SearchHit], dense: list[SearchHit], sparse: list[SearchHit], limit: int

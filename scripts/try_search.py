@@ -2,6 +2,7 @@
 
     python -m scripts.try_search "What must a bank do if FAR exceeds 5%?"
     python -m scripts.try_search "14A.9.6" --raw      # also show the raw dense/BM25 lists
+    python -m scripts.try_search "remote onboarding" --sector insurance_takaful --documents amlcft
 
 Shows:
   FUSED   the top candidates after RRF, with each one's dense/BM25 rank
@@ -14,15 +15,11 @@ A learning/debugging tool, not the app. Costs 1 Gemini + 1 Cohere call.
 
 import argparse
 
-from qdrant_client import QdrantClient
-
+from app.agent.schemas import DOCUMENT_TITLES, SECTOR_LABELS
 from app.core.config import settings
-from app.db.vector_repository import SearchHit, VectorRepository
+from app.db.vector_repository import SearchHit
 from app.services.bm25_encoder import tokenize
-from app.services.embedding_service import embed_query
-from app.services.rerank_service import CohereReranker
-from app.services.retrieval_service import RetrievalService
-from app.services.search_service import SearchService
+from app.services.search_service import build_search_service
 from app.services.selection import Candidate
 
 FUSED_SHOWN = 10
@@ -47,17 +44,19 @@ def main() -> None:
     cli = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     cli.add_argument("question", nargs="+")
     cli.add_argument("--raw", action="store_true", help="also print the raw dense and BM25 lists")
+    cli.add_argument("--sector", choices=[*SECTOR_LABELS, "all"], default=settings.default_sector)
+    cli.add_argument("--documents", nargs="*", choices=list(DOCUMENT_TITLES), default=[])
     args = cli.parse_args()
     question = " ".join(args.question)
 
-    repo = VectorRepository(QdrantClient(url=settings.qdrant_url), settings.qdrant_collection)
-    reranker = CohereReranker(settings.cohere_api_key, settings.rerank_model, settings.rerank_calls_per_minute)
-    result = SearchService(RetrievalService(repo, embed_query), reranker).search(question)
+    sector = None if args.sector == "all" else args.sector
+    result = build_search_service().search(question, sector=sector, documents=args.documents)
     retrieval = result.retrieval
 
     print(f"Question: {question}")
-    print(f"BM25 tokens: {tokenize(question)} | paragraph refs: {retrieval.paragraph_refs or '-'}")
-    print(f"Preferred sector: {result.preferred_sector}")
+    refs = [r.paragraph_id for r in retrieval.paragraph_refs]
+    print(f"BM25 tokens: {tokenize(question)} | paragraph refs: {refs or '-'}")
+    print(f"Preferred sector: {result.preferred_sector or 'none (all sectors)'} | documents: {args.documents or 'all'}")
     if args.raw:
         show_raw("DENSE (meaning)", retrieval.dense)
         show_raw("BM25 (exact words)", retrieval.sparse)

@@ -1,0 +1,190 @@
+"""The LLM adapter, rate limiter, cache and retry policy. No API calls: a
+fake chat model returns scripted raw/parsed responses or raises."""
+
+import threading
+
+import pytest
+from langchain_core.messages import AIMessage, HumanMessage
+from pydantic import BaseModel
+
+from app.core.retry import is_transient
+from app.llm.cache import ResponseCache
+from app.llm.models import ChatModelClient, LLMUnavailableError
+from app.llm.rate_limit import SlidingWindowLimiter
+
+
+class Answer(BaseModel):
+    text: str
+
+
+class RateLimited(Exception):
+    is_retryable = True
+
+
+def ok(text="hi"):
+    return {"raw": AIMessage(content="{}", usage_metadata=usage()), "parsed": Answer(text=text), "parsing_error": None}
+
+
+def invalid():
+    return {"raw": AIMessage(content="not json", usage_metadata=usage()), "parsed": None, "parsing_error": "bad json"}
+
+
+def usage():
+    return {"input_tokens": 10, "output_tokens": 2, "total_tokens": 12}
+
+
+class FakeChat:
+    def __init__(self, script):
+        self.script = script
+        self.conversations = []
+
+    def with_structured_output(self, schema, method, include_raw):
+        assert include_raw
+        return self
+
+    def invoke(self, conversation):
+        self.conversations.append(conversation)
+        step = self.script.pop(0)
+        if isinstance(step, Exception):
+            raise step
+        return step
+
+
+@pytest.fixture(autouse=True)
+def no_backoff_sleep(monkeypatch):
+    monkeypatch.setattr("time.sleep", lambda seconds: None)
+
+
+def client(scripts, cache=None):
+    chats = {model: FakeChat(script) for model, script in scripts.items()}
+    llm = ChatModelClient(
+        cache=cache,
+        build=lambda model: chats[model],
+        models_for=lambda role: ("primary", "backup"),
+        requests_per_minute=1000,
+    )
+    return llm, chats
+
+
+MESSAGES = [HumanMessage(content="question")]
+
+
+def test_valid_output_is_returned_with_its_cost():
+    llm, _ = client({"primary": [ok()], "backup": []})
+    result = llm.invoke("planner", MESSAGES, Answer)
+    assert result.output.text == "hi" and result.model == "primary"
+    assert (result.calls, result.input_tokens, result.output_tokens) == (1, 10, 2)
+    assert llm.requests == {"primary": 1}
+
+
+def test_malformed_output_gets_one_repair_retry():
+    llm, chats = client({"primary": [invalid(), ok()], "backup": []})
+    result = llm.invoke("planner", MESSAGES, Answer)
+    assert result.calls == 2 and result.input_tokens == 20
+    repair = chats["primary"].conversations[1]
+    assert len(repair) == 3 and "did not match" in repair[-1].content
+
+
+def test_output_still_malformed_after_repair_falls_back_to_the_other_model():
+    llm, _ = client({"primary": [invalid(), invalid()], "backup": [ok("from backup")]})
+    result = llm.invoke("planner", MESSAGES, Answer)
+    assert result.model == "backup" and result.output.text == "from backup"
+
+
+def test_transient_errors_are_retried_three_times_then_fall_back():
+    llm, _ = client({"primary": [RateLimited(), RateLimited(), RateLimited()], "backup": [ok()]})
+    assert llm.invoke("planner", MESSAGES, Answer).model == "backup"
+    assert llm.requests == {"primary": 3, "backup": 1}
+
+
+def test_transient_error_then_success_stays_on_the_primary():
+    llm, _ = client({"primary": [RateLimited(), ok()], "backup": []})
+    assert llm.invoke("planner", MESSAGES, Answer).model == "primary"
+
+
+def test_a_bad_request_is_not_retried_or_sent_to_the_fallback():
+    llm, _ = client({"primary": [ValueError("400 bad request")], "backup": [ok()]})
+    with pytest.raises(ValueError):
+        llm.invoke("planner", MESSAGES, Answer)
+    assert llm.requests == {"primary": 1}
+
+
+def test_both_models_failing_raises_unavailable():
+    llm, _ = client({"primary": [RateLimited()] * 3, "backup": [RateLimited()] * 3})
+    with pytest.raises(LLMUnavailableError):
+        llm.invoke("planner", MESSAGES, Answer)
+
+
+def test_cached_response_costs_no_request(tmp_path):
+    cache = ResponseCache(tmp_path / "cache.sqlite")
+    llm, _ = client({"primary": [ok("first")], "backup": []}, cache)
+    first = llm.invoke("planner", MESSAGES, Answer)
+    second = llm.invoke("planner", MESSAGES, Answer)
+    assert second.cached and second.output == first.output and second.calls == first.calls
+    assert llm.requests == {"primary": 1}
+
+
+def test_a_different_prompt_is_a_cache_miss(tmp_path):
+    cache = ResponseCache(tmp_path / "cache.sqlite")
+    llm, _ = client({"primary": [ok("a"), ok("b")], "backup": []}, cache)
+    llm.invoke("planner", MESSAGES, Answer)
+    assert llm.invoke("planner", [HumanMessage(content="other")], Answer).output.text == "b"
+
+
+# ---------------------------------------------------------------- rate limiter
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 0.0
+        self.slept = []
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.now += seconds
+
+
+def test_limiter_waits_only_when_the_window_is_full():
+    clock = FakeClock()
+    limiter = SlidingWindowLimiter(3, clock=lambda: clock.now, sleep=clock.sleep)
+    for _ in range(3):
+        assert limiter.acquire() == 0
+    clock.now = 10
+    waited = limiter.acquire()  # the 4th call waits until the 1st is 60 s old
+    assert waited == pytest.approx(50.05)
+
+
+def test_limiter_is_sliding_not_fixed_window():
+    clock = FakeClock()
+    limiter = SlidingWindowLimiter(2, clock=lambda: clock.now, sleep=clock.sleep)
+    clock.now = 59
+    limiter.acquire()
+    limiter.acquire()
+    clock.now = 61  # a fixed window would reset at 60 and allow a burst here
+    assert limiter.acquire() > 0
+
+
+def test_limiter_counts_every_call_from_parallel_threads():
+    limiter = SlidingWindowLimiter(100)
+    threads = [threading.Thread(target=limiter.acquire) for _ in range(40)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(limiter._calls) == 40
+
+
+# ---------------------------------------------------------------- retry policy
+
+
+class Coded(Exception):
+    def __init__(self, code):
+        self.code = code
+
+
+@pytest.mark.parametrize(
+    ("exc", "transient"),
+    [(Coded(429), True), (Coded(503), True), (Coded(400), False), (TimeoutError(), True), (RateLimited(), True)],
+)
+def test_only_temporary_errors_are_transient(exc, transient):
+    assert is_transient(exc) is transient

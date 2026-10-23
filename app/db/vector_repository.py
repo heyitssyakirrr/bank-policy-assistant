@@ -55,6 +55,11 @@ def _filter(exclude_tags: Sequence[str] = (), **must_any: Sequence[str]) -> mode
     return models.Filter(must=must or None, must_not=must_not or None) if (must or must_not) else None
 
 
+def _documents(documents: Sequence[str]) -> dict[str, Sequence[str]]:
+    """The filter clause for "only these documents" ([] = all documents)."""
+    return {"doc_code": documents} if documents else {}
+
+
 def _hits(points: Iterable[Any]) -> list[SearchHit]:
     return [SearchHit(id=str(p.id), score=getattr(p, "score", 0.0) or 0.0, payload=p.payload or {}) for p in points]
 
@@ -169,11 +174,13 @@ class VectorRepository:
         sparse: SparseVec | None,
         limit: int = 20,
         exclude_tags: Sequence[str] = DEFAULT_EXCLUDED_TAGS,
+        documents: Sequence[str] = (),
     ) -> tuple[list[SearchHit], list[SearchHit]]:
         """Run the dense and BM25 searches in ONE round trip (Qdrant's batch
-        query) and return both ranked lists. Fusing them is the caller's job:
-        this layer stores and finds, it doesn't decide relevance."""
-        query_filter = _filter(exclude_tags)
+        query) and return both ranked lists, optionally only within some
+        documents. Fusing them is the caller's job: this layer stores and
+        finds, it doesn't decide relevance."""
+        query_filter = _filter(exclude_tags, **_documents(documents))
         requests: list[models.QueryRequest] = []
         if dense is not None:
             requests.append(
@@ -195,14 +202,19 @@ class VectorRepository:
         return dense_hits, sparse_hits
 
     def get_by_paragraph_ids(
-        self, paragraph_ids: Sequence[str], exclude_tags: Sequence[str] = DEFAULT_EXCLUDED_TAGS, limit: int = 20
+        self,
+        paragraph_ids: Sequence[str],
+        exclude_tags: Sequence[str] = DEFAULT_EXCLUDED_TAGS,
+        limit: int = 20,
+        documents: Sequence[str] = (),
     ) -> list[SearchHit]:
-        """Exact lookup by paragraph number (a filter, not a similarity search)."""
+        """Exact lookup by paragraph number (a filter, not a similarity search).
+        "8.2" exists in all three documents, so pass `documents` when known."""
         if not paragraph_ids:
             return []
         records, _ = self._client.scroll(
             self._collection,
-            scroll_filter=_filter(exclude_tags, paragraph_id=paragraph_ids),
+            scroll_filter=_filter(exclude_tags, paragraph_id=paragraph_ids, **_documents(documents)),
             limit=limit,
             with_payload=True,
             with_vectors=False,

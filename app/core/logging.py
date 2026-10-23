@@ -17,13 +17,13 @@ class RequestIdFilter(logging.Filter):
 
 def setup_logging(level: str = "INFO") -> None:
     handler = logging.StreamHandler()
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s | %(levelname)s | req=%(request_id)s | %(name)s | %(message)s")
-    )
+    handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | req=%(request_id)s | %(name)s | %(message)s"))
     handler.addFilter(RequestIdFilter())
     root = logging.getLogger()
     root.handlers = [handler]
     root.setLevel(level)
+    # The SDK warns about "automatic function calling" on every structured call; we don't use it.
+    logging.getLogger("google_genai.models").setLevel(logging.ERROR)
 
 
 logger = logging.getLogger("app")

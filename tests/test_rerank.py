@@ -6,10 +6,13 @@ from types import SimpleNamespace
 import pytest
 
 from app.ingestion.manifest import DocumentSpec
-from app.services.rerank_service import CohereReranker, RerankScore
-from app.services.retrieval_service import RankedChunk, RetrievalResult
+from app.llm.cache import ResponseCache
+from app.llm.rate_limit import SlidingWindowLimiter
+from app.services import search_service
+from app.services.rerank_service import CachedReranker, CohereReranker, NoReranker, RerankScore
+from app.services.retrieval_service import ParagraphLookup, RankedChunk, RetrievalResult
 from app.services.search_service import SearchService
-from app.services.selection import Candidate, collapse_sector_duplicates, detect_sector, select_final
+from app.services.selection import Candidate, collapse_sector_duplicates, select_final
 
 NON_FTF = "Reporting institutions may establish non face-to-face (non-FTF) business relationships with its customers."
 
@@ -39,8 +42,8 @@ def test_repeated_rule_collapses_to_the_banking_copy():
     assert len(collapsed) == 3
 
 
-def test_question_naming_a_sector_keeps_that_sectors_copy():
-    kept, _ = collapse_sector_duplicates(cands(BANKING, INSURANCE, EKYC), detect_sector("takaful operators"))
+def test_preferred_sector_keeps_that_sectors_copy():
+    kept, _ = collapse_sector_duplicates(cands(BANKING, INSURANCE, EKYC), "insurance_takaful")
     assert [c.id for c in kept] == ["14B.17.1", "8.26"]
 
 
@@ -59,17 +62,10 @@ def test_collapsing_frees_slots_for_other_sources():
     assert [c.id for c in final] == ["14A.15.1", "8.26"]  # e-KYC 8.26 now makes the cut
 
 
-@pytest.mark.parametrize(
-    ("question", "sector"),
-    [
-        ("Can a takaful operator onboard customers remotely?", "insurance_takaful"),
-        ("rules for remittance companies", "money_services"),
-        ("e-money issuers and CDD", "non_bank_e_money"),
-        ("What must a bank do if FAR exceeds 5%?", None),  # -> default sector (banking)
-    ],
-)
-def test_detect_sector(question, sector):
-    assert detect_sector(question) == sector
+def test_no_preferred_sector_keeps_the_best_ranked_copy_and_demotes_nothing():
+    selection = select_final(cands(MSB_ONLY, INSURANCE, BANKING, EKYC), top_n=3, preferred_sector=None)
+    assert [c.id for c in selection.final] == ["14C.16.12", "14B.17.1", "8.26"]
+    assert not selection.demoted
 
 
 # ---------------------------------------------------------------- named paragraphs
@@ -95,7 +91,8 @@ class FakeRetrieval:
     def __init__(self, chunks):
         self.chunks = chunks
 
-    def retrieve(self, question):
+    def retrieve(self, question, documents=(), paragraph_refs=None):
+        self.documents = documents
         return RetrievalResult(question, self.chunks, [], [], [], {"embed": 1.0, "search": 1.0})
 
 
@@ -117,7 +114,7 @@ class BrokenReranker:
 
 def test_reranker_reorders_candidates():
     retrieval = FakeRetrieval([chunk("a", "sampling approach"), chunk("b", "Level 3 notify the Bank")])
-    result = SearchService(retrieval, ScoreByKeyword("Level 3"), top_n=2).search("FAR above 5%")
+    result = SearchService(retrieval, ScoreByKeyword("Level 3"), top_n=2).search("FAR above 5%", sector="banking")
     assert [c.id for c in result.final] == ["b", "a"]
     assert result.final[0].fused_rank == 2 and result.final[0].rerank_score == 1.0  # moved from #2 to #1
     assert result.reranked
@@ -125,8 +122,27 @@ def test_reranker_reorders_candidates():
 
 def test_reranker_failure_falls_back_to_fused_order():
     retrieval = FakeRetrieval([chunk("a", "first"), chunk("b", "second")])
-    result = SearchService(retrieval, BrokenReranker(), top_n=2).search("anything")
+    result = SearchService(retrieval, BrokenReranker(), top_n=2).search("anything", sector="banking")
     assert not result.reranked and [c.id for c in result.final] == ["a", "b"]
+
+
+def test_search_passes_the_document_filter_and_records_it():
+    retrieval = FakeRetrieval([chunk("a", "first")])
+    result = SearchService(retrieval, ScoreByKeyword("x"), top_n=2).search("q", sector=None, documents=["ekyc"])
+    assert retrieval.documents == ["ekyc"] and result.documents == ["ekyc"] and result.preferred_sector is None
+
+
+def test_cached_reranker_calls_the_api_once_per_query(tmp_path):
+    calls = []
+
+    class Counting(ScoreByKeyword):
+        def rerank(self, query, documents):
+            calls.append(query)
+            return super().rerank(query, documents)
+
+    reranker = CachedReranker(Counting("b"), ResponseCache(tmp_path / "c.sqlite"), "m")
+    first = reranker.rerank("q", ["a", "b"])
+    assert reranker.rerank("q", ["a", "b"]) == first and calls == ["q"]
 
 
 # ---------------------------------------------------------------- Cohere adapter (fake client)
@@ -142,7 +158,9 @@ def test_cohere_reranker_sends_all_documents_and_maps_scores():
                 results=[SimpleNamespace(index=1, relevance_score=0.9), SimpleNamespace(index=0, relevance_score=0.2)]
             )
 
-    reranker = CohereReranker(api_key="", model="rerank-v4.0-pro", calls_per_minute=10, client=FakeClient())
+    reranker = CohereReranker(
+        api_key="", model="rerank-v4.0-pro", calls_per_minute=10, client=FakeClient(), limiter=SlidingWindowLimiter(10)
+    )
     scores = reranker.rerank("q", ["doc a", "doc b"])
     assert scores == [RerankScore(1, 0.9), RerankScore(0, 0.2)]
     assert calls[0]["top_n"] == 2 and calls[0]["model"] == "rerank-v4.0-pro"
@@ -203,10 +221,8 @@ def test_rule_for_another_sector_is_ranked_below_rules_for_the_user():
     assert [c.id for c in final.demoted] == ["14C.16.12"]
 
 
-def test_naming_the_sector_in_the_question_keeps_its_rules_on_top():
-    final = select_final(
-        cands(MSB_ONLY, EKYC), top_n=2, preferred_sector=detect_sector("rules for remittance companies")
-    )
+def test_preferring_another_sector_keeps_its_rules_on_top():
+    final = select_final(cands(MSB_ONLY, EKYC), top_n=2, preferred_sector="money_services")
     assert [c.id for c in final.final] == ["14C.16.12", "8.26"]
 
 
@@ -228,3 +244,18 @@ def test_sector_phrase_tags_paragraphs_in_documents_without_sector_parts():
         == "money_services"
     )
     assert spec.sector_for("8.10", ("PART B",), "G 8.10 In identifying and verifying an individual's identity") is None
+
+
+def test_search_lookup_returns_named_paragraphs_as_exact_matches():
+    class Lookup:
+        def lookup(self, refs):
+            return [SimpleNamespace(id="x", payload={"paragraph_id": refs[0].paragraph_id})]
+
+    found = SearchService(Lookup(), BrokenReranker()).lookup([ParagraphLookup("ekyc", "8.4")])
+    assert [c.id for c in found] == ["x"] and found[0].exact_match
+
+
+def test_no_cohere_key_means_no_reranking_not_a_crash(monkeypatch):
+    monkeypatch.setattr(search_service.settings, "cohere_api_key", "")
+    service = search_service.build_search_service()
+    assert isinstance(service._reranker, NoReranker)

@@ -269,41 +269,46 @@ schemas are the most important design in the agent.
 
 ```python
 class SearchRequest(BaseModel):
-    query: str                          # a self-contained search query
-    documents: list[DocCode] = []       # [] = all documents; e.g. ["ekyc"]
-    sector: Sector | None = None        # None = the user's own sector
+    query: str  # a self-contained search query
+    documents: list[DocCode] = []  # [] = all documents; e.g. ["ekyc"]
+    sector: Sector | None = None  # None = the user's own sector
+
 
 class ParagraphRef(BaseModel):
-    document: DocCode | None            # None only when the user didn't say
-    paragraph_id: str                   # "8.2", "14A.9.6"
+    document: DocCode | None  # None only when the user didn't say
+    paragraph_id: str  # "8.2", "14A.9.6"
+
 
 class QueryPlan(BaseModel):
     route: Literal["search", "lookup", "search_and_lookup", "clarify", "out_of_scope", "small_talk"]
-    standalone_question: str            # follow-up rewritten using history
-    searches: list[SearchRequest]       # 1–3: decomposition happens here
+    standalone_question: str  # follow-up rewritten using history
+    searches: list[SearchRequest]  # 1–3: decomposition happens here
     paragraph_refs: list[ParagraphRef]
     clarifying_question: str | None
-    reasoning: str                      # one sentence, shown in the UI steps
+    reasoning: str  # one sentence, shown in the UI steps
+
 
 class EvidenceReview(BaseModel):
-    relevant_evidence: list[str]        # ["E1", "E4"]: noise is dropped before answering
+    relevant_evidence: list[str]  # ["E1", "E4"]: noise is dropped before answering
     is_sufficient: bool
     missing_information: str | None
     follow_up_searches: list[SearchRequest]
     cross_references: list[ParagraphRef]  # "as required under paragraph 8.4" → fetch 8.4
 
+
 class Statement(BaseModel):
     text: str
     obligation: Literal["must", "should_or_may", "information"]
-    evidence_ids: list[str]             # every statement must cite ≥ 1
-    quote: str                          # exact supporting words copied from the cited evidence
-    topic: str                          # which part of a multi-part question this statement answers
+    evidence_ids: list[str]  # every statement must cite ≥ 1
+    quote: str  # exact supporting words copied from the cited evidence
+    topic: str  # which part of a multi-part question this statement answers
+
 
 class GroundedAnswer(BaseModel):
     status: Literal["answered", "partially_answered", "not_covered"]
-    summary: str                        # the direct answer in 1–2 sentences
+    summary: str  # the direct answer in 1–2 sentences
     statements: list[Statement]
-    gaps: str | None                    # what the documents don't say
+    gaps: str | None  # what the documents don't say
 ```
 
 **How citations work (the bonus point):**
@@ -332,14 +337,19 @@ class GroundedAnswer(BaseModel):
 | 1 | Every cited ID is evidence we actually gave the model | Drop that ID (fixable) |
 | 2 | Every statement still has ≥ 1 valid ID | Drop the statement (fixable) |
 | 3 | The quote appears in one of its cited passages | Serious |
-| 4 | `must` statements cite at least one S paragraph | Serious |
+| 4 | A `must` statement does not cite only G paragraphs (unmarked appendix/table passages may state obligations) | Serious |
 | 5 | Status agrees with content (`answered` needs statements; `not_covered` has none) | Fixable: correct the status |
 | 6 | Something valid is left | No: becomes `not_covered` (refusal) |
 
 - Fixable problems are corrected silently and recorded in the audit log.
 - Serious problems mean one regeneration, with feedback listing the problems.
   If they persist, the bad statements are removed and the status is
-  downgraded to `partially_answered`.
+  downgraded to `partially_answered`. The summary is then rebuilt by code
+  from the surviving statements, because the model's summary is not
+  verified and may repeat a removed claim.
+- If the generator itself fails (both models down), the user gets a
+  "temporarily unavailable" notice, or, on a regeneration, the verified part
+  of the first answer.
 - The full verification report is saved with the turn.
 
 ### 5.5 Safety and bounds
@@ -359,7 +369,9 @@ class GroundedAnswer(BaseModel):
   6 attempts, because it can afford to wait.
 - If an LLM call fails after retries, the system **degrades** instead of
   crashing: a planner failure falls back to a plain search on the original
-  question, and a reranker failure falls back to fused order (already built).
+  question, a reviewer failure answers from all evidence, a reranker failure
+  (or no Cohere key) falls back to fused order, and a query-embedding
+  failure falls back to BM25 + exact lookup (`dense_used=False`).
 - Answers carry a short notice: *"Based on BNM policy documents. Not legal
   advice."*
 
@@ -392,6 +404,30 @@ class GroundedAnswer(BaseModel):
 - **Flash-Lite reliability:** flat schemas with `Literal` enums, a short
   example in each prompt, a 1-repair retry, and a code sanitiser after every
   LLM output (caps, valid IDs, known document codes).
+
+### 5.7 Build-time changes (24 Oct, autonomous build)
+Recorded here so the plan stays the source of truth:
+- **Verifier check 4** flags `must` only when *all* cited passages are G.
+  e-KYC Appendix 2 para 13 (the FAR rule) has no S/G marker but is an
+  obligation; the strict "needs an S" rule rejected the correct FAR answer.
+- **Quote check:** each `...`-joined fragment needs ≥ 3 words, in order.
+- **Per-turn state:** a conversation is one checkpointer thread, but only
+  `messages` carries over. `turn_input()` resets every per-turn field; summed
+  and appended fields use reducers that accept `None` as "reset".
+- **Live retry policy** `retry_live` (3 attempts, 1–8 s + jitter, timeouts
+  retried) for Gemini, embeddings and Cohere; indexing keeps 6 attempts.
+- **Rate limiting:** one thread-safe sliding-window limiter per model (and
+  one for Cohere, one for query embeddings), shared across roles and
+  parallel searches.
+- **Sector:** `detect_sector` is gone. The caller passes the preferred sector
+  (planner, else sidebar); `None` ("show all sectors") demotes nothing.
+  Traditional mode keeps regex paragraph refs, limited to the searched
+  documents.
+- **Evidence across searches:** the evidence reducer also drops another
+  sector's copy of a rule already found by a different search (lookups are
+  always kept).
+- **Cached LLM results** report the calls they originally cost, so the
+  budget and graph path are identical with or without the cache.
 
 ## 6. Memory and chat history (Postgres)
 

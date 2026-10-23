@@ -7,15 +7,15 @@ the final top N:
    14A.15.1 (banking), 14B.17.1 (insurance), 14C.16.1 (money services) and
    14D.16.1 (e-money) are word-for-word the same. All four would rank highly
    and fill the top 5 with one rule, crowding out other sources. We keep one
-   copy: the user's sector (banking by default, or the sector the question
-   names), else the best-ranked.
+   copy: the preferred sector's (the user's, or the one the planner read in
+   the question), else the best-ranked.
 
 2. OTHER SECTORS' RULES RANK LOWER. A rule that exists only for money
    services (no banking twin to collapse into) is still the wrong answer
    for a bank employee. Chunks for another sector are moved below chunks
    that apply to the user (their sector, or no sector). Demoted, not
-   deleted: they remain a fallback, and naming a sector in the question
-   ("remittance companies") makes that sector the preferred one.
+   deleted: they remain a fallback. With no preferred sector ("Not sure:
+   show all sectors") nothing is demoted.
 
 3. NAMED PARAGRAPHS ARE NEVER DROPPED. If the question names a paragraph
    ("14A.9.6"), that chunk is guaranteed a place, whatever its rerank score.
@@ -40,14 +40,6 @@ from app.services.retrieval_service import RankedChunk
 DUPLICATE_SIMILARITY = 0.85
 _LEADING_NUMBER_RE = re.compile(r"^(?:[SG]\s+)?\d{1,2}[A-Z]?(?:\.\d{1,2})+\s*")
 _WORD_RE = re.compile(r"\w+")
-
-# Phrases that mean the user is asking about a specific sector. Checked in order.
-SECTOR_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "insurance_takaful": ("insurance", "insurer", "takaful", "policyholder"),
-    "money_services": ("money services", "money-changing", "money changer", "remittance", "msb", "wholesale currency"),
-    "non_bank_e_money": ("e-money", "non-bank", "designated payment instrument"),
-    "banking": ("deposit-taking", "banking institution", "licensed bank"),
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,26 +70,22 @@ class Selection:
     demoted: list[Candidate] = field(default_factory=list)  # other-sector chunks moved down the order
 
 
-def detect_sector(question: str) -> str | None:
-    text = question.lower()
-    for sector, phrases in SECTOR_KEYWORDS.items():
-        if any(re.search(rf"\b{re.escape(phrase)}\b", text) for phrase in phrases):
-            return sector
-    return None
-
-
-def _words(candidate: Candidate) -> frozenset[str]:
-    """The rule's words, ignoring anything with a digit. Copies of a rule
+def rule_words(text: str) -> frozenset[str]:
+    """A rule's words, ignoring anything with a digit. Copies of a rule
     differ in exactly that: their own number ("14A.15.1" vs "14B.17.1") and
     references to their own sector's paragraphs ("paragraph 14A.5" vs
     "paragraph 14C.6"). If copies differ in an amount, the sector preference
     still keeps the copy that applies to the user."""
-    body = _LEADING_NUMBER_RE.sub("", candidate.chunk.payload.get("text", ""))
+    body = _LEADING_NUMBER_RE.sub("", text)
     return frozenset(w for w in _WORD_RE.findall(body.lower()) if not any(ch.isdigit() for ch in w))
 
 
-def _similar(a: frozenset[str], b: frozenset[str]) -> bool:
+def same_rule(a: frozenset[str], b: frozenset[str]) -> bool:
     return bool(a and b) and len(a & b) / len(a | b) >= DUPLICATE_SIMILARITY
+
+
+def _words(candidate: Candidate) -> frozenset[str]:
+    return rule_words(candidate.chunk.payload.get("text", ""))
 
 
 def _wins(challenger: Candidate, holder: Candidate, preferred_sector: str | None) -> bool:
@@ -126,7 +114,7 @@ def collapse_sector_duplicates(
             (
                 pos
                 for pos, holder in enumerate(kept)
-                if holder.sector not in (None, candidate.sector) and _similar(words[holder.id], words[candidate.id])
+                if holder.sector not in (None, candidate.sector) and same_rule(words[holder.id], words[candidate.id])
             ),
             None,
         )
@@ -141,7 +129,7 @@ def collapse_sector_duplicates(
 
 
 def applies_to_user(candidate: Candidate, preferred_sector: str | None) -> bool:
-    return candidate.exact_match or candidate.sector in (None, preferred_sector)
+    return candidate.exact_match or preferred_sector is None or candidate.sector in (None, preferred_sector)
 
 
 def select_final(candidates: Sequence[Candidate], top_n: int, preferred_sector: str | None) -> Selection:

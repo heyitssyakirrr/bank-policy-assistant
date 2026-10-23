@@ -9,7 +9,7 @@ from qdrant_client import QdrantClient
 from app.db.vector_repository import VectorRepository
 from app.ingestion.indexer import EmbeddingCache, index_chunks
 from app.services.embedding_service import build_request
-from app.services.retrieval_service import RetrievalService, find_paragraph_refs, rrf_fuse
+from app.services.retrieval_service import ParagraphLookup, RetrievalService, find_paragraph_refs, rrf_fuse
 from tests.test_indexing import DIM, CountingEmbedder, fake_embed
 from tests.test_ingestion import APPENDIX, MAIN_BODY, chunks_for
 
@@ -71,7 +71,31 @@ def test_exact_paragraph_is_returned_first(service):
     result = service.retrieve("what is required under paragraph 8.10")
     top = result.chunks[0]
     assert top.exact_match and top.payload["paragraph_id"] == "8.10"
-    assert result.paragraph_refs == ["8.10"]
+    assert result.paragraph_refs == [ParagraphLookup(None, "8.10")]
+
+
+def test_paragraph_lookup_respects_the_document(service):
+    assert [h.payload["paragraph_id"] for h in service.lookup([ParagraphLookup("ekyc", "8.10")])] == ["8.10"]
+    assert service.lookup([ParagraphLookup("ftfc", "8.10")]) == []  # same number, other document: not found
+
+
+def test_explicit_empty_refs_skip_the_regex_lookup(service):
+    result = service.retrieve("what is required under paragraph 8.10", paragraph_refs=[])
+    assert not any(c.exact_match for c in result.chunks) and result.paragraph_refs == []
+
+
+def test_embedding_failure_falls_back_to_bm25(service):
+    def broken(_):
+        raise TimeoutError("embedding quota")
+
+    service._embed_query = broken
+    result = service.retrieve("FAR thresholds Level 3 notify the Bank")
+    assert not result.dense_used and result.dense == [] and result.chunks
+
+
+def test_document_filter_limits_every_search(service):
+    assert service.retrieve("FAR thresholds", documents=["ftfc"]).chunks == []
+    assert service.retrieve("FAR thresholds", documents=["ekyc"]).chunks
 
 
 def test_fused_results_have_no_duplicates_and_carry_ranks(service):
