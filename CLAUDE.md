@@ -1,6 +1,8 @@
 # CLAUDE.md: Bank Policy Compliance Assistant
 
 Read at the start of every session, in this order:
+0. **docs/HANDOFF.md**: where the build stands, the system end to end, and
+   how to guide Syakir (`/tour`). Part B is written for you.
 1. **PROGRESS.md**: what is done and which milestone is next.
 2. **PROJECT_PLAN.md**: the design (§2–§8) and the milestones (§10).
 3. **docs/design_qa.md**: why each design decision was made.

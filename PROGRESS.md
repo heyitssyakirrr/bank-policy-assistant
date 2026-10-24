@@ -1,7 +1,8 @@
 # Progress: Bank Policy Compliance Assistant
 
-> Update after every work session. To continue in a new chat, paste this file,
-> PROJECT_PLAN.md, and the files you're working on.
+> Update after every work session. A new Claude Code session reads
+> docs/HANDOFF.md first (where things stand, the system end to end, and how
+> to guide Syakir with `/tour`).
 
 **Last updated:** 2026-10-24
 **Goal:** live Streamlit demo of the agentic RAG, **Mon 26 Oct 2026**
