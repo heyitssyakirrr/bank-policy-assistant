@@ -5,9 +5,9 @@
 
 **Last updated:** 2026-10-24
 **Goal:** live Streamlit demo of the agentic RAG, **Mon 26 Oct 2026**
-**Current step:** M5, golden set + evaluation harness (autonomous build by
-Claude Code; see PROJECT_PLAN.md §10)
-**Tests:** 271 passing
+**Current step:** M6, packaging (autonomous build by Claude Code; see
+PROJECT_PLAN.md §10)
+**Tests:** 285 passing
 **Repo:** _(add your GitHub link)_
 
 ---
@@ -23,8 +23,8 @@ DONE ████████████████████  M1  LLM layer
 DONE ████████████████████  M2  LangGraph agent
 DONE ████████████████████  M3  Postgres memory + audit + FastAPI
 DONE ████████████████████  M4  Streamlit UI
-NEXT ░░░░░░░░░░░░░░░░░░░░  M5  Golden set + evaluation harness
-     ░░░░░░░░░░░░░░░░░░░░  M6  Docker, CI, LangSmith
+DONE ████████████████████  M5  Golden set + evaluation harness
+NEXT ░░░░░░░░░░░░░░░░░░░░  M6  Docker, CI, LangSmith
      ░░░░░░░░░░░░░░░░░░░░  M7–M9  Evaluation runs, fixes, docs, freeze
 ```
 
@@ -84,7 +84,13 @@ packaging.
   `scripts/screenshot_ui.py`, `docs/screenshots/`. While testing the UI:
   per-role thinking, code-marked cross-references, verifier check 7.
   Reviewed by code-reviewer: 4 major + 8 minor findings, all fixed.
-- [ ] M5 Golden set + evaluation harness (smoke + full)
+- [x] M5 Golden set + evaluation harness (smoke + full) (24 Oct).
+  `evals/`: golden_set.yaml (40 items, §8.2 counts), golden.py (check/show),
+  golden_review.yaml (who checked what), metrics.py, retrieval_eval.py
+  (ablation + regressions), answer_eval.py, judge.py, report.py, run.py
+  (`--smoke/--full/--only/--estimate`). Evaluation page lists full runs
+  first. Reviewed by code-reviewer: 11 major-ish + 8 minor findings, all
+  fixed (gold labels corrected: fact-6, compare-2/4/5/6, fact-3).
 - [ ] **Syakir:** spot-check ≥ 10 golden-set items against the PDFs
 - [ ] M6 Docker (index from committed cache), `.env.example`, LangSmith, CI
 - [ ] M7 Evaluation #1 (**Syakir runs it** when Claude Code says ready) + fixes
@@ -101,7 +107,11 @@ packaging.
 | 24 Oct ~02:20–02:38 | M2 smoke: the five §2 cases in agentic mode (8.10 ×3, comparison ×2, follow-up pair, para 8.2, credit card), incl. 3 retried 504s, + 9 query embeddings | 21 | 7 | 9 |
 | 24 Oct ~02:46 | M3 smoke: 2 API requests (agentic follow-up across requests, NRIC in turn 1), incl. 1 retried 504, + 3 query embeddings | 5 | 2 | 3 |
 | 24 Oct ~03:00–03:40 | M4: UI chat question, 3 Compare runs (8.10), generator prompt/thinking trials via ask.py (cached planner/reviewer) | 15 | 11 | 5 |
-| **24 Oct total** | | **41** | **22** | **19** |
+| 24 Oct 14:09 | M5 smoke run #1 (8 retrieval + 4 answer items, judged) | 13 | 7 | 12 |
+| 24 Oct 14:49 | M5 smoke run #2 after review fixes (+ followup-1; judge prompt changed) | 13 | 4 | 6 |
+| 24 Oct 14:57 | M5 smoke report regenerated (all cached) | 0 | 0 | 0 |
+| 24 Oct ~14:40 | M6 clean-clone Docker check: 1 API question (+ 0 embedding calls for indexing) | 2 | 1 | 2 |
+| **24 Oct total (window ending 15:00)** | | **69** | **34** | **39** |
 
 ---
 
@@ -124,6 +134,8 @@ packaging.
 | M3 API: "Can a bank onboard customer 900101-14-5678 without meeting face to face?" then "what about money changers?" (same conversation_id) | NRIC masked in prompts, logs and `turns`; turn 2 rewritten from the Postgres checkpoint, sector → money services, cites the AML 14C copies (14C.16.1, 14C.16.10-12); 31 s (one 504 retry) and 9 s; 2 `turns` + 13 `turn_events` rows; UPDATE and TRUNCATE on the audit tables rejected |
 | M4 UI Compare: "What does e-KYC paragraph 8.10 require?" | traditional 7.2 s, 1 LLM call: only 8.10 (MAY). Agentic 40.6 s, 5 LLM calls: followed 8.10 → 8.4, regenerated once (check 7), answered MUST from 8.4 (S) + MAY from 8.10 (G). Screenshot: docs/screenshots/compare.png |
 | Generator thinking trial (8.10) | low: ignored the fetched 8.4 even with an explicit prompt rule; medium: used it (4.3 s generator) |
+| M5 smoke (20261024-1457-smoke) | agentic: outcome 100%, citation recall 83%, relevancy 5.0; traditional: outcome 80% (answered the ambiguous "para 8.2" instead of asking), citation recall 50% (missed 8.4 for xref-1 and 14B.17.1 for the follow-up). Faithfulness 100% both. Ablation (8 items): hybrid MRR@5 0.94 vs dense 0.75 / BM25 0.74; rerank lifts Recall@5 78% → 88% |
+| M6 Docker (clean-clone copy, own ports and volumes) | index bootstrap: 0 Gemini calls, 1,219 points from the committed cache; API healthy; one agentic question answered and verified (3 LLM calls, 24.6 s); UI page 200 |
 | Gemini latency | planner 11 s with default thinking → 3 s with `thinking_level=low`. gemini-3.1-flash-lite returned 504 DEADLINE_EXCEEDED on ~1 in 8 calls (retried); a stalled call cost up to 30 s, now 20 s |
 
 **Latency:** embed ~0.7–0.9 s · Qdrant search ~30–45 ms · rerank ~0.8–1.3 s
@@ -170,6 +182,18 @@ bank-policy-assistant/
 ---
 
 ## Known issues / open items
+- **For M7 (found by the M5 smoke run and review):**
+  - traditional exact lookup ignores a document named in the question:
+    "paragraph 9.1 of the Fair Treatment … policy" puts e-KYC 9.1 and AML
+    9.1 above FTFC 9.1 (lookup-3, MRR@5 1.00 → 0.33);
+  - agentic fact-6 never retrieved e-KYC Appendix 2:11 (the notification
+    contents);
+  - Cohere rerank demotes the gold paragraph in compare-1 and sector-1
+    (MRR@5 1.00 → 0.50);
+  - agentic latency p50 ~34 s on the smoke set (504 retries and the
+    generator's medium thinking).
+- Temporary Docker volumes `bpaclean_pgdata` and `bpaclean_qdrant_data`
+  from the M6 clean-clone check can be deleted (`docker volume rm …`).
 - AML 14A.14.1 and 14B.16.2 boundaries (Docling merges them). Accepted.
 - Exact lookup ignores which document a paragraph is in ("8.2" exists in
   several). **Fixed on Day 2** by document-aware refs from the planner.
@@ -182,6 +206,14 @@ bank-policy-assistant/
 ---
 
 ## Decisions log (why things are the way they are)
+
+**Autonomous build, M5 (2026-10-24)**
+- See PROJECT_PLAN §5.7 "Evaluation details". Corrected gold labels after
+  the review re-read them: fact-6 is App. 2 paras 10 + 11 (para 13 is what
+  the Bank may do); added e-KYC 8.27 to fact-3/compare-5, 8.3 to compare-2,
+  AML 24.1 to compare-4, 14C.16.1/10/11 to compare-6. Sector items use the
+  sector they ask about (followup-1 keeps banking: the follow-up switches).
+- Full-run estimate ~160 + ~100 + 15 calls (not ~575).
 
 **Autonomous build, M4 (2026-10-24)**
 - See PROJECT_PLAN §5.7 (Gemini settings, cross-references, Streamlit UI,

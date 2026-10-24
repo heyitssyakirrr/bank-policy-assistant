@@ -1,0 +1,2279 @@
+{
+ "run": "20261024-1457-smoke",
+ "meta": {
+  "date": "2026-10-24 14:57",
+  "commit": "fdc8d1e",
+  "prompt_version": "2026-10-24.8",
+  "golden_size": 40,
+  "models": {
+   "planner": "google_genai:gemini-3.1-flash-lite",
+   "reviewer": "google_genai:gemini-3.1-flash-lite",
+   "generator": "google_genai:gemini-3.5-flash-lite",
+   "judge": "google_genai:gemini-3.1-flash-lite",
+   "judge cross-check": "google_genai:gemini-3.8-flash"
+  },
+  "review": {
+   "claude_code": [
+    "lookup-1",
+    "lookup-2",
+    "lookup-3",
+    "lookup-4",
+    "fact-1",
+    "fact-2",
+    "fact-3",
+    "fact-4",
+    "fact-5",
+    "fact-6",
+    "fact-7",
+    "fact-8",
+    "fact-9",
+    "fact-10",
+    "compare-1",
+    "compare-2",
+    "compare-3",
+    "compare-4",
+    "compare-5",
+    "compare-6",
+    "xref-1",
+    "xref-2",
+    "xref-3",
+    "xref-4",
+    "sector-1",
+    "sector-2",
+    "sector-3",
+    "sector-4",
+    "followup-1",
+    "followup-2",
+    "followup-3",
+    "followup-4"
+   ],
+   "syakir": []
+  }
+ },
+ "usage": {
+  "llm_requests": {},
+  "embeddings": 0,
+  "reranks": 0,
+  "cache_hits": 93
+ },
+ "retrieval_ablation": [
+  {
+   "stage": "dense only",
+   "n": 8,
+   "hit@5": 0.875,
+   "recall@5": 0.71875,
+   "mrr@5": 0.75
+  },
+  {
+   "stage": "BM25 only",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.78125,
+   "mrr@5": 0.74375
+  },
+  {
+   "stage": "hybrid (RRF)",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.78125,
+   "mrr@5": 0.9375
+  },
+  {
+   "stage": "+ exact lookup",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.78125,
+   "mrr@5": 0.8541666666666666
+  },
+  {
+   "stage": "+ rerank",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.875,
+   "mrr@5": 0.8125
+  },
+  {
+   "stage": "+ selection",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.875,
+   "mrr@5": 0.8125
+  }
+ ],
+ "retrieval_errors": [],
+ "answers_by_mode": {
+  "traditional": {
+   "n": 5,
+   "errors": 0,
+   "outcome_accuracy": 0.8,
+   "answer_rate": 1.0,
+   "refusal_accuracy": 1.0,
+   "clarify_accuracy": 0.0,
+   "citation_recall": 0.5,
+   "evidence_recall": 0.5,
+   "verified": 1.0,
+   "faithfulness": 1.0,
+   "relevancy": 3.6666666666666665,
+   "self_judged": 0,
+   "judge_agreement": null,
+   "cross_checked": 0,
+   "llm_calls": 1.0,
+   "tokens": 2798.0,
+   "latency_p50": null,
+   "latency_p95": null,
+   "latency_n": 0
+  },
+  "agentic": {
+   "n": 5,
+   "errors": 0,
+   "outcome_accuracy": 1.0,
+   "answer_rate": 1.0,
+   "refusal_accuracy": 1.0,
+   "clarify_accuracy": 1.0,
+   "citation_recall": 0.8333333333333334,
+   "evidence_recall": 0.8333333333333334,
+   "verified": 1.0,
+   "faithfulness": 1.0,
+   "relevancy": 5.0,
+   "self_judged": 0,
+   "judge_agreement": null,
+   "cross_checked": 0,
+   "llm_calls": 2.6,
+   "tokens": 4744.2,
+   "latency_p50": null,
+   "latency_p95": null,
+   "latency_n": 0
+  }
+ },
+ "retrieval": [
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "dense only",
+   "ranked": [
+    "amlcft:14A.9.16",
+    "amlcft:14A.15.6",
+    "amlcft:14A.9.25",
+    "amlcft:14A.15.9",
+    "amlcft:14A.2"
+   ],
+   "hit": 0.0,
+   "recall": 0.0,
+   "mrr": 0.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "BM25 only",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:8.1",
+    "amlcft:14A.9.7",
+    "amlcft:10.2.5",
+    "ekyc:8.13"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:14A.9.16",
+    "amlcft:14A.15.6",
+    "amlcft:8.1",
+    "amlcft:14A.9.7"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:14A.9.16",
+    "amlcft:14A.15.6",
+    "amlcft:8.1",
+    "amlcft:14A.9.7"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "+ rerank",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:14A.9.7",
+    "ekyc:8.13",
+    "amlcft:14A.9.5",
+    "amlcft:14A.9.9"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "+ selection",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:14A.9.7",
+    "ekyc:8.13",
+    "amlcft:14A.9.5",
+    "amlcft:14A.9.9"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "dense only",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.4",
+    "ftfc:9.2",
+    "ftfc:8.1",
+    "ftfc:Appendix 1:-"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "BM25 only",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:Appendix 4:2",
+    "ftfc:15.1",
+    "ftfc:Appendix 4:1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:9.4",
+    "ftfc:15.1",
+    "ftfc:8.2"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ekyc:9.1",
+    "amlcft:9.1",
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:9.4"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 0.3333333333333333
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "+ rerank",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "amlcft:9.1",
+    "ftfc:Appendix 1:-",
+    "ftfc:9.4"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "+ selection",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "amlcft:9.1",
+    "ftfc:Appendix 1:-",
+    "ekyc:9.1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-1",
+   "category": "paraphrased",
+   "stage": "dense only",
+   "ranked": [
+    "ekyc:8.1",
+    "ekyc:8.3",
+    "ekyc:8.28",
+    "ekyc:8.33",
+    "ekyc:8.25"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-1",
+   "category": "paraphrased",
+   "stage": "BM25 only",
+   "ranked": [
+    "ekyc:8.1",
+    "ekyc:8.25",
+    "ekyc:8.28",
+    "ekyc:8.18",
+    "ekyc:Appendix 4:4"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-1",
+   "category": "paraphrased",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ekyc:8.1",
+    "ekyc:8.28",
+    "ekyc:8.25",
+    "ekyc:8.3",
+    "ekyc:8.18"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-1",
+   "category": "paraphrased",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ekyc:8.1",
+    "ekyc:8.28",
+    "ekyc:8.25",
+    "ekyc:8.3",
+    "ekyc:8.18"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-1",
+   "category": "paraphrased",
+   "stage": "+ rerank",
+   "ranked": [
+    "ekyc:8.1",
+    "ekyc:8.3",
+    "ekyc:10.2",
+    "ekyc:8.2",
+    "ekyc:10.1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-1",
+   "category": "paraphrased",
+   "stage": "+ selection",
+   "ranked": [
+    "ekyc:8.1",
+    "ekyc:8.3",
+    "ekyc:10.2",
+    "ekyc:8.2",
+    "ekyc:10.1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-4",
+   "category": "paraphrased",
+   "stage": "dense only",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:Appendix 2:-",
+    "ftfc:Appendix 2:4",
+    "ftfc:Appendix 2:1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-4",
+   "category": "paraphrased",
+   "stage": "BM25 only",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:Appendix 2:-",
+    "ftfc:9.2",
+    "ftfc:Appendix 2:-",
+    "ftfc:9.4"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-4",
+   "category": "paraphrased",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:Appendix 2:-",
+    "ftfc:Appendix 2:-",
+    "ftfc:9.4"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-4",
+   "category": "paraphrased",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:Appendix 2:-",
+    "ftfc:Appendix 2:-",
+    "ftfc:9.4"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-4",
+   "category": "paraphrased",
+   "stage": "+ rerank",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:Appendix 2:1",
+    "ftfc:Appendix 2:2",
+    "ftfc:Appendix 2:-"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-4",
+   "category": "paraphrased",
+   "stage": "+ selection",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:Appendix 2:1",
+    "ftfc:Appendix 2:2",
+    "ftfc:Appendix 2:-"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "fact-6",
+   "category": "paraphrased",
+   "stage": "dense only",
+   "ranked": [
+    "ekyc:Appendix 2:13",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:11",
+    "ekyc:8.21"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "fact-6",
+   "category": "paraphrased",
+   "stage": "BM25 only",
+   "ranked": [
+    "ekyc:Appendix 2:13",
+    "ekyc:Appendix 2:10",
+    "amlcft:21.3.2",
+    "ekyc:Appendix 2:5",
+    "ekyc:Appendix 2:4"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "fact-6",
+   "category": "paraphrased",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ekyc:Appendix 2:13",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:4",
+    "ekyc:Appendix 2:5",
+    "ekyc:8.21"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "fact-6",
+   "category": "paraphrased",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ekyc:Appendix 2:13",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:4",
+    "ekyc:Appendix 2:5",
+    "ekyc:8.21"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "fact-6",
+   "category": "paraphrased",
+   "stage": "+ rerank",
+   "ranked": [
+    "ekyc:Appendix 2:13",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:11",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:5"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "fact-6",
+   "category": "paraphrased",
+   "stage": "+ selection",
+   "ranked": [
+    "ekyc:Appendix 2:13",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:11",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:5"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "compare-1",
+   "category": "comparison",
+   "stage": "dense only",
+   "ranked": [
+    "amlcft:14A.15.2",
+    "amlcft:14A.15.7",
+    "amlcft:14D.16.2",
+    "amlcft:14C.16.8",
+    "amlcft:14B.17.2"
+   ],
+   "hit": 1.0,
+   "recall": 0.25,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "compare-1",
+   "category": "comparison",
+   "stage": "BM25 only",
+   "ranked": [
+    "ekyc:6.2",
+    "amlcft:14B.17.7",
+    "amlcft:14C.16.8",
+    "amlcft:14A.15.7",
+    "ekyc:Appendix 3:1"
+   ],
+   "hit": 1.0,
+   "recall": 0.25,
+   "mrr": 0.25
+  },
+  {
+   "item_id": "compare-1",
+   "category": "comparison",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "amlcft:14A.15.7",
+    "amlcft:14C.16.8",
+    "amlcft:14B.17.7",
+    "amlcft:14A.15.2",
+    "amlcft:14D.16.2"
+   ],
+   "hit": 1.0,
+   "recall": 0.25,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "compare-1",
+   "category": "comparison",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "amlcft:14A.15.7",
+    "amlcft:14C.16.8",
+    "amlcft:14B.17.7",
+    "amlcft:14A.15.2",
+    "amlcft:14D.16.2"
+   ],
+   "hit": 1.0,
+   "recall": 0.25,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "compare-1",
+   "category": "comparison",
+   "stage": "+ rerank",
+   "ranked": [
+    "ekyc:6.2",
+    "ekyc:8.10",
+    "amlcft:14A.15.7",
+    "amlcft:14C.16.8",
+    "amlcft:14A.15.2"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "compare-1",
+   "category": "comparison",
+   "stage": "+ selection",
+   "ranked": [
+    "ekyc:6.2",
+    "ekyc:8.10",
+    "amlcft:14A.15.7",
+    "amlcft:14A.15.2",
+    "ekyc:Appendix 3:1"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "dense only",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.13",
+    "ekyc:8.28",
+    "ekyc:8.11"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "BM25 only",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.11",
+    "ekyc:8.22",
+    "ekyc:8.12",
+    "ekyc:8.9"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.11",
+    "ekyc:8.1",
+    "ekyc:8.16"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.11",
+    "ekyc:8.1",
+    "ekyc:8.16"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "+ rerank",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.22",
+    "ekyc:8.11",
+    "ekyc:8.12"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "+ selection",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.22",
+    "ekyc:8.12",
+    "ekyc:8.16"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "sector-1",
+   "category": "sector_specific",
+   "stage": "dense only",
+   "ranked": [
+    "amlcft:14B.17.1",
+    "amlcft:14B.17.5",
+    "amlcft:14B.17.9",
+    "amlcft:14B.17.3",
+    "amlcft:14B.17.2"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "sector-1",
+   "category": "sector_specific",
+   "stage": "BM25 only",
+   "ranked": [
+    "ftfc:10.11",
+    "ftfc:13.5",
+    "ftfc:15.9",
+    "ftfc:15.6",
+    "amlcft:14B.17.1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 0.2
+  },
+  {
+   "item_id": "sector-1",
+   "category": "sector_specific",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "amlcft:14B.17.1",
+    "amlcft:14B.17.9",
+    "amlcft:14B.17.2",
+    "amlcft:14B.17.5",
+    "amlcft:14B.17.8"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "sector-1",
+   "category": "sector_specific",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "amlcft:14B.17.1",
+    "amlcft:14B.17.9",
+    "amlcft:14B.17.2",
+    "amlcft:14B.17.5",
+    "amlcft:14B.17.8"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "sector-1",
+   "category": "sector_specific",
+   "stage": "+ rerank",
+   "ranked": [
+    "amlcft:14B.17.9",
+    "amlcft:14B.17.1",
+    "amlcft:14B.17.2",
+    "amlcft:14B.17.7",
+    "amlcft:14B.17.5"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 0.5
+  },
+  {
+   "item_id": "sector-1",
+   "category": "sector_specific",
+   "stage": "+ selection",
+   "ranked": [
+    "amlcft:14B.17.9",
+    "amlcft:14B.17.1",
+    "amlcft:14B.17.2",
+    "amlcft:14B.17.7",
+    "amlcft:14B.17.5"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 0.5
+  }
+ ],
+ "turns": [
+  {
+   "item_id": "fact-6",
+   "category": "paraphrased",
+   "mode": "traditional",
+   "conversation": "User: What must a bank do if FAR exceeds 5%?",
+   "standalone_question": "What must a bank do if FAR exceeds 5%?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "When the false acceptance rate exceeds five percent for two months within a four-month period, a financial institution must notify the Bank in writing within seven working days and submit a detailed assessment along with mitigation measures and Board evidence.",
+    "statements": [
+     {
+      "text": "A financial institution must notify the Bank in writing within seven working days if the false acceptance rate exceeds five percent for any two months within a four-month period.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E2"
+      ],
+      "quote": "shall notify the Bank and submit an assessment of the e-KYC solution performance and mitigation measures",
+      "topic": "FAR exceeds 5%"
+     },
+     {
+      "text": "A financial institution must include specific assessments, analyses of false positives, proposed rectification and mitigating actions, and evidence of Board satisfaction in the notification.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E3"
+      ],
+      "quote": "the notification to the Bank shall include the following",
+      "topic": "notification contents"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "10bbebc9-6127-5ea8-b6c3-091e148a168a",
+     "document": "ekyc",
+     "scope": "Appendix 2",
+     "paragraph_id": "13",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 2, para 13, p. 19",
+     "text": "13. Where FAR exceeds 5% and the Bank assesses a financial institution and its Board did not effectively undertake the expected rectification measures on vulnerabilities that were identified, relevant enforcement action may be taken against the financial institution. The Bank may also specify controls or intervention measures as deemed necessary.",
+     "page": 21,
+     "source": "search",
+     "query": "What must a bank do if FAR exceeds 5%?",
+     "rerank_score": 0.97459,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "e59e7f13-72c9-52f1-a0ba-bd377de079ff",
+     "document": "ekyc",
+     "scope": "Appendix 2",
+     "paragraph_id": "10",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 2, para 10, table, p. 17",
+     "text": "10. To strengthen solution performance and enable quicker cadence for remedial action, a financial institution shall adopt a tiered approach for FAR threshold monitoring, review and notification, as follows:\nTable 1: FAR thresholds and actions to be taken\n| FAR thresholds | Action to be taken when breached |\n|---|---|\n| Level 1 (0% - 3%) | A financial institution shall continuously monitor and improve the capability of e-KYC solutions. |\n| Level 2 (> 3%) | A financial institution shall conduct a risk assessment for notification to the Board and internal review to strengthen the e-KYC solution, including taking the appropriate rectification measures. In conducting the risk assessment, financial institutions may consider the FAR performance together with other relevant factors, observation points and considerations to provide an informed view of the risk level of the solution performance. For example, this may include the total number of identification and verification cases performed, number of false positives, existing mitigating controls, fraud patterns observed, etc. |\n| Level 3 (> 5%) | Where FAR is measured to be more than 5% for any two months within a four-month period, a financial institution shall notify the Bank and submit an assessment of the e-KYC solution performance and mitigation measures. The notification shall be submitted to Jabatan Penyeliaan Konglomerat Kewangan, Jabatan Penyeliaan Perbankan, Jabatan Penyeliaan Insurans dan Takaful or Jabatan Pemantauan Perkhidmatan Pembayaran, as the case may be, in writing within seven (7) working days upon the completion of the latest audit and detection of this FAR scenario. |",
+     "page": 19,
+     "source": "search",
+     "query": "What must a bank do if FAR exceeds 5%?",
+     "rerank_score": 0.9587854,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "3f62cf35-7fdb-5f14-a525-5f5688387031",
+     "document": "ekyc",
+     "scope": "Appendix 2",
+     "paragraph_id": "11",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 2, para 11, p. 18",
+     "text": "11. In respect of paragraph 10 of this Appendix, the notification to the Bank shall include the following-\n(i) an assessment on the current performance of the e-KYC solution, including reasons for the observed level of FAR, risk level of the e-KYC solution, as well as existing mitigating controls in place;\n(ii) an assessment on whether the false positive case was successfully onboarded, or if the false positive case was detected and rejected through other mitigating controls 24 already in place as part of the e-KYC process. This assessment shall also include an analysis on the nature of the false positive cases (e.g. whether the cases are related to any mule activity, an emerging fraud trend/modus operandi, suspicious transactions, etc);\n(iii) proposed rectification actions to reduce the FAR going forward and address any identified vulnerabilities;\n(iv) proposed new mitigating actions or additional controls to safeguard the effectiveness of the e-KYC process; and\n(v) evidence that the Board is satisfied with items (i) to (iv) above, and with the decision to either continue or suspend using the same e-KYC solution, when such assessment by the Board has been made.\n[24] e.g., Via verification against existing credible bureau files, fraud databases or any other form of fraud detection measures.",
+     "page": 20,
+     "source": "search",
+     "query": "What must a bank do if FAR exceeds 5%?",
+     "rerank_score": 0.8848775,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "a6aeafc5-9911-5fca-8d3e-ca288af893ce",
+     "document": "ekyc",
+     "scope": "Appendix 2",
+     "paragraph_id": "10",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 2, para 10, p. 17",
+     "text": "10. To strengthen solution performance and enable quicker cadence for remedial action, a financial institution shall adopt a tiered approach for FAR threshold monitoring, review and notification, as follows:",
+     "page": 19,
+     "source": "search",
+     "query": "What must a bank do if FAR exceeds 5%?",
+     "rerank_score": 0.82480085,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "e33a198d-dbc8-560e-a478-a44787e39952",
+     "document": "ekyc",
+     "scope": "Appendix 2",
+     "paragraph_id": "5",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 2, para 5, p. 16",
+     "text": "5. In determining the appropriate sampling approach, a financial institution shall at minimum take into consideration the following sampling dimensions to ensure that FAR results from the sample size tested appropriately reflects the severity of any FAR threshold breaches 22 :\n(i) Minimum sample size: The sample size shall minimally meet a 95% confidence level and 3% margin of error or 400 cases per month, whichever is higher.\n(ii) Time-based considerations: For the first 6 months of implementation where the level of assurance of the e-KYC solution effectiveness is not yet optimal, a higher sample size is recommended to gain a higher level of assurance. Subsequent to this, a financial institution may lower the sampling size tested if the FAR performance is satisfactory.\n(iii) Risk-based considerations: For higher risk financial products or segments (e.g. current and savings account for customers that do not have an existing bank account), a financial institution may wish to conduct a larger or full sampling approach.\n(iv) Progressive sampling: Where one or more false positives are detected in the initial sample, a financial institution may wish to consider a higher sample size, with a focus on e-KYC cases that may share the same profile and result in a similar outcome as the identified false positive case.\n[22] For avoidance of doubt, the higher or stricter of considerations in (i) - (iv) shall apply in determining the minimum sample size. For example, if the minimum sample size required from 5(ii) is lower than that needed to meet requirements in 5(i), the minimum sample size required shall not be lower than that of 5(i).",
+     "page": 18,
+     "source": "search",
+     "query": "What must a bank do if FAR exceeds 5%?",
+     "rerank_score": 0.7985641,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:11"
+   ],
+   "evidence_keys": [
+    "ekyc:Appendix 2:13",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:11",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:5"
+   ],
+   "citation_recall": 1.0,
+   "evidence_recall": 1.0,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1904,
+   "output_tokens": 913,
+   "latency_ms": 68,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "fact-6",
+   "category": "paraphrased",
+   "mode": "agentic",
+   "conversation": "User: What must a bank do if FAR exceeds 5%?",
+   "standalone_question": "What must a banking institution do if the False Acceptance Rate (FAR) exceeds 5% under the e-KYC Policy Document?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "If the False Acceptance Rate exceeds 5% for any two months within a four-month period, a financial institution must notify the Bank and submit an assessment of the e-KYC solution performance and mitigation measures in writing within seven working days.",
+    "statements": [
+     {
+      "text": "If the False Acceptance Rate exceeds 5% for any two months within a four-month period, a financial institution must notify the Bank and submit an assessment of the e-KYC solution performance and mitigation measures.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "shall notify the Bank and submit an assessment of the e-KYC solution performance and mitigation measures",
+      "topic": "FAR threshold breach"
+     },
+     {
+      "text": "The financial institution must submit the notification in writing within seven working days upon the completion of the latest audit and detection of this FAR scenario.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "in writing within seven (7) working days upon the completion of the latest audit and detection of this FAR scenario",
+      "topic": "notification timeline"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "e59e7f13-72c9-52f1-a0ba-bd377de079ff",
+     "document": "ekyc",
+     "scope": "Appendix 2",
+     "paragraph_id": "10",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 2, para 10, table, p. 17",
+     "text": "10. To strengthen solution performance and enable quicker cadence for remedial action, a financial institution shall adopt a tiered approach for FAR threshold monitoring, review and notification, as follows:\nTable 1: FAR thresholds and actions to be taken\n| FAR thresholds | Action to be taken when breached |\n|---|---|\n| Level 1 (0% - 3%) | A financial institution shall continuously monitor and improve the capability of e-KYC solutions. |\n| Level 2 (> 3%) | A financial institution shall conduct a risk assessment for notification to the Board and internal review to strengthen the e-KYC solution, including taking the appropriate rectification measures. In conducting the risk assessment, financial institutions may consider the FAR performance together with other relevant factors, observation points and considerations to provide an informed view of the risk level of the solution performance. For example, this may include the total number of identification and verification cases performed, number of false positives, existing mitigating controls, fraud patterns observed, etc. |\n| Level 3 (> 5%) | Where FAR is measured to be more than 5% for any two months within a four-month period, a financial institution shall notify the Bank and submit an assessment of the e-KYC solution performance and mitigation measures. The notification shall be submitted to Jabatan Penyeliaan Konglomerat Kewangan, Jabatan Penyeliaan Perbankan, Jabatan Penyeliaan Insurans dan Takaful or Jabatan Pemantauan Perkhidmatan Pembayaran, as the case may be, in writing within seven (7) working days upon the completion of the latest audit and detection of this FAR scenario. |",
+     "page": 19,
+     "source": "search",
+     "query": "False Acceptance Rate FAR threshold 5%",
+     "rerank_score": 0.94996727,
+     "requested_sector": "banking"
+    },
+    {
+     "id": "E2",
+     "chunk_id": "10bbebc9-6127-5ea8-b6c3-091e148a168a",
+     "document": "ekyc",
+     "scope": "Appendix 2",
+     "paragraph_id": "13",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 2, para 13, p. 19",
+     "text": "13. Where FAR exceeds 5% and the Bank assesses a financial institution and its Board did not effectively undertake the expected rectification measures on vulnerabilities that were identified, relevant enforcement action may be taken against the financial institution. The Bank may also specify controls or intervention measures as deemed necessary.",
+     "page": 21,
+     "source": "search",
+     "query": "False Acceptance Rate FAR threshold 5%",
+     "rerank_score": 0.9351336,
+     "requested_sector": "banking"
+    },
+    {
+     "id": "E3",
+     "chunk_id": "a6aeafc5-9911-5fca-8d3e-ca288af893ce",
+     "document": "ekyc",
+     "scope": "Appendix 2",
+     "paragraph_id": "10",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 2, para 10, p. 17",
+     "text": "10. To strengthen solution performance and enable quicker cadence for remedial action, a financial institution shall adopt a tiered approach for FAR threshold monitoring, review and notification, as follows:",
+     "page": 19,
+     "source": "search",
+     "query": "False Acceptance Rate FAR threshold 5%",
+     "rerank_score": 0.8842793,
+     "requested_sector": "banking"
+    },
+    {
+     "id": "E4",
+     "chunk_id": "e33a198d-dbc8-560e-a478-a44787e39952",
+     "document": "ekyc",
+     "scope": "Appendix 2",
+     "paragraph_id": "5",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 2, para 5, p. 16",
+     "text": "5. In determining the appropriate sampling approach, a financial institution shall at minimum take into consideration the following sampling dimensions to ensure that FAR results from the sample size tested appropriately reflects the severity of any FAR threshold breaches 22 :\n(i) Minimum sample size: The sample size shall minimally meet a 95% confidence level and 3% margin of error or 400 cases per month, whichever is higher.\n(ii) Time-based considerations: For the first 6 months of implementation where the level of assurance of the e-KYC solution effectiveness is not yet optimal, a higher sample size is recommended to gain a higher level of assurance. Subsequent to this, a financial institution may lower the sampling size tested if the FAR performance is satisfactory.\n(iii) Risk-based considerations: For higher risk financial products or segments (e.g. current and savings account for customers that do not have an existing bank account), a financial institution may wish to conduct a larger or full sampling approach.\n(iv) Progressive sampling: Where one or more false positives are detected in the initial sample, a financial institution may wish to consider a higher sample size, with a focus on e-KYC cases that may share the same profile and result in a similar outcome as the identified false positive case.\n[22] For avoidance of doubt, the higher or stricter of considerations in (i) - (iv) shall apply in determining the minimum sample size. For example, if the minimum sample size required from 5(ii) is lower than that needed to meet requirements in 5(i), the minimum sample size required shall not be lower than that of 5(i).",
+     "page": 18,
+     "source": "search",
+     "query": "False Acceptance Rate FAR threshold 5%",
+     "rerank_score": 0.8632072,
+     "requested_sector": "banking"
+    },
+    {
+     "id": "E5",
+     "chunk_id": "e31f1f30-353e-5199-91e4-6dd9a5c1f82e",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.21",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.21 (S), p. 10",
+     "text": "S 8.21 For the purposes of paragraph 8.20, in ensuring accuracy of the e-KYC solution, a financial institution shall take steps to minimise the False Acceptance Rates (FAR), defined as \ud835\udc39\ud835\udc4e\ud835\udc59\ud835\udc60\ud835\udc52 \ud835\udc43\ud835\udc5c\ud835\udc60\ud835\udc56\ud835\udc61\ud835\udc56\ud835\udc63\ud835\udc52 (\ud835\udc39\ud835\udc4e\ud835\udc59\ud835\udc60\ud835\udc52 \ud835\udc43\ud835\udc5c\ud835\udc60\ud835\udc56\ud835\udc61\ud835\udc56\ud835\udc63\ud835\udc52 + \ud835\udc47\ud835\udc5f\ud835\udc62\ud835\udc52 \ud835\udc41\ud835\udc52\ud835\udc54\ud835\udc4e\ud835\udc61\ud835\udc56\ud835\udc63\ud835\udc52) \ud835\udc65 100 . In measuring and assessing the FAR, a financial institution shall observe the considerations and requirements listed in Appendix 2 8 .\n[8] For avoidance of doubt, requirements for FAR within this policy document do not apply to e-KYC solutions where verification of customer identity is automated without the use of artificial intelligence, machine learning or other similar forms of predictive algorithms.",
+     "page": 12,
+     "source": "search",
+     "query": "False Acceptance Rate FAR threshold 5%",
+     "rerank_score": 0.8497718,
+     "requested_sector": "banking"
+    }
+   ],
+   "cited_keys": [
+    "ekyc:Appendix 2:10"
+   ],
+   "evidence_keys": [
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:13",
+    "ekyc:Appendix 2:10",
+    "ekyc:Appendix 2:5",
+    "ekyc:8.21"
+   ],
+   "citation_recall": 0.5,
+   "evidence_recall": 0.5,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 3,
+   "input_tokens": 3656,
+   "output_tokens": 1769,
+   "latency_ms": 49,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "mode": "traditional",
+   "conversation": "User: What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+   "standalone_question": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 8.10 provides guidance that financial institutions may undertake document verification, biometric matching, and liveness detection when identifying and verifying an individual's identity. It refers to the identification and verification requirements under paragraph 8.4 of the e-KYC policy document and the AML/CFT/CPF and TFS for FIs policy document.",
+    "statements": [
+     {
+      "text": "Paragraph 8.10 provides guidance that financial institutions may undertake measures such as document verification, biometric matching, and liveness detection when identifying and verifying an individual's identity through e-KYC.",
+      "obligation": "should_or_may",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "a financial institution may undertake measures, including but not limited to the following",
+      "topic": "e-KYC measures"
+     },
+     {
+      "text": "Paragraph 8.10 refers to the requirement to identify and verify an individual's identity through e-KYC under paragraph 8.4 of the policy document and the AML/CFT/CPF and TFS for FIs policy document.",
+      "obligation": "information",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "as required under paragraph 8.4 of this policy document and the AML/CFT/CPF and TFS for FIs policy document",
+      "topic": "referred rule"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "ce5686c5-8b53-5f53-822b-5a0e4f4311e4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.10",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.10 (G), p. 7",
+     "text": "G 8.10 In identifying and verifying an individual's identity through e-KYC as required under paragraph 8.4 of this policy document and the AML/CFT/CPF and TFS for FIs policy document, a financial institution may undertake measures, including but not limited to the following-\n(i) Document verification - i.e., ensuring that the government issued ID to support e-KYC customer verification is authentic by utilising appropriate fraud detection mechanisms;\n(ii) Biometric matching - i.e., verifying the customer against a government issued ID 3 by utilising biometric technology; and/or\n(iii) Liveness detection - i.e, ensuring the customer is a live subject and not an impersonator (e.g. through use of photos, videos, synthetic human face masks 4 ) by utilising liveness detection.\n[3] i.e, National Registration Identity Card (NRIC), passport, or any other official documents.\n[4] Synthetic human face masks are designed to impersonate real human faces and made from materials such as silicone or otherwise. For purposes of e-KYC, such masks may be used to defraud facial recognition software.",
+     "page": 9,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.9780182,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "3db25895-78f7-5a61-9bd1-3e165982abd4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.9",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.9 (S), p. 7",
+     "text": "S 8.9 In verifying the identity of an individual or beneficial owner under paragraphs 8.10 and 8.13 of this policy document and as required under the AML/CFT/CPF and TFS for FIs policy document, financial institutions shall:\n(i) be satisfied with the identity of the individual or the beneficial owner through reliable and independent documentation, electronic data or any other measures that the financial institution deems necessary;\n(ii) be satisfied with the veracity of information referred to in paragraph 8.9 (i) when verifying the identity of the individual or beneficial owner; and\n(iii) ensure that documents, data or information collected is kept up-to-date and relevant.",
+     "page": 9,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.951612,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "0b7352b8-162b-5a06-b0b5-c2cc63a10d14",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.22",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.22 (S), p. 10",
+     "text": "S 8.22 Financial institutions shall ensure that the technology provider appointed to provide the e-KYC solution conducts the following:\n(i) Ensure that the e-KYC solution, encompassing the three (3) e-KYC modules namely document verification, biometric matching and liveness detection as referenced in paragraph 8.10, has been assessed by a credible 9 external independent assessor in accordance with the scope and criteria as provided in Appendix 3. This includes ensuring that the technology provider has put measures in place to address the gaps or weaknesses identified from such assessment in a timely manner;\n(ii) Ensure that the relevant certification(s) is obtained for the various modules under e-KYC solution, where such certification is available 10 .\n[9] Credible external independent assessor refers to an assessor who has the capability and expertise in conducting assessments on identity verification solutions.\n[10] The modules are biometric matching/facial recognition, liveness test and ID verification. For example, ISO 197945 for facial recognition and ISO 30107-3 for liveness test (presentation attack detection) module.",
+     "page": 12,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.9189106,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "6f1b8c9d-7289-5b38-964a-0773abc0628b",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.12",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.12 (G), p. 8",
+     "text": "G 8.12 A financial institution may implement e-KYC to identify and verify legal persons, subject to meeting the requirements in this policy document and the requirements for legal persons specified under the AML/CFT/CPF and TFS for FIs policy document 6 on CDD for legal persons.\n[5] For avoidance of doubt, a sole proprietor is not deemed as legal person under this policy document. Accordingly, the on-boarding of sole proprietors through e-KYC is subject to e-KYC process for individual as specified under paragraph 8.10.\n[6] In particular, requirements relating to legal persons as well as clubs, societies and charities contained within paragraphs 14A.9, 14B.11, 14C.10 and 14D.9 of the AML/CFT/CPF and TFs for FIs Policy Document.",
+     "page": 10,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.8854731,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "a80f320a-f4ca-5834-95b1-5a5f1d7042de",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.16",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.16 (S), p. 9",
+     "text": "S 8.16 In relation to paragraph 8.13 (ii), where the identification and verification of the authorised person is conducted via electronic means, a financial institution shall ensure that -\n(i) electronic communication or documents that capture collective decision making by the directors of the legal person (e.g. digital forms of Directors Resolution or Letter of Authority) to appoint the authorised person and establish business relations are maintained in accordance with relevant record keeping requirements as specified under paragraph 24 of the AML/CFT/CPF and TFS for FIs Policy Document;\n(ii) such electronic means adopted to identify and verify the authorised person are within the legal person's constitution or any other document which sets out the powers of the legal person; and\n(iii) the authorised person is identified and verified through e-KYC as an individual, having due regard to the measures listed under paragraph 8.10 of this policy document.",
+     "page": 11,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.8766766,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ekyc:8.10"
+   ],
+   "evidence_keys": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.22",
+    "ekyc:8.12",
+    "ekyc:8.16"
+   ],
+   "citation_recall": 0.5,
+   "evidence_recall": 0.5,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1857,
+   "output_tokens": 1630,
+   "latency_ms": 69,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "mode": "agentic",
+   "conversation": "User: What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+   "standalone_question": "What does paragraph 8.10 of the e-KYC policy document require, and what are the specific rules referenced within it?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 8.10 of the e-KYC policy document provides guidance on measures a financial institution may undertake for e-KYC, while the referenced paragraph 8.4 requires institutions to ensure and demonstrate that e-KYC measures are secure and effective.",
+    "statements": [
+     {
+      "text": "A financial institution may undertake measures such as document verification, biometric matching, and liveness detection when identifying and verifying an individual's identity through e-KYC.",
+      "obligation": "should_or_may",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "a financial institution may undertake measures, including but not limited to the following",
+      "topic": "e-KYC measures"
+     },
+     {
+      "text": "A financial institution must ensure and be able to demonstrate on a continuing basis that appropriate measures for e-KYC identification and verification are secure and effective.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E6"
+      ],
+      "quote": "a financial institution shall ensure and be able to demonstrate on a continuing basis that appropriate measures for the identification and verification of a customer's identity through e-KYC are secure and effective",
+      "topic": "secure and effective"
+     },
+     {
+      "text": "Measures for identification and verification must be proportionate to the risk dimensions of eKYC.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E6"
+      ],
+      "quote": "Measures for identification and verification shall be proportionate to the risk dimensions of eKYC",
+      "topic": "risk proportionality"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "ce5686c5-8b53-5f53-822b-5a0e4f4311e4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.10",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.10 (G), p. 7",
+     "text": "G 8.10 In identifying and verifying an individual's identity through e-KYC as required under paragraph 8.4 of this policy document and the AML/CFT/CPF and TFS for FIs policy document, a financial institution may undertake measures, including but not limited to the following-\n(i) Document verification - i.e., ensuring that the government issued ID to support e-KYC customer verification is authentic by utilising appropriate fraud detection mechanisms;\n(ii) Biometric matching - i.e., verifying the customer against a government issued ID 3 by utilising biometric technology; and/or\n(iii) Liveness detection - i.e, ensuring the customer is a live subject and not an impersonator (e.g. through use of photos, videos, synthetic human face masks 4 ) by utilising liveness detection.\n[3] i.e, National Registration Identity Card (NRIC), passport, or any other official documents.\n[4] Synthetic human face masks are designed to impersonate real human faces and made from materials such as silicone or otherwise. For purposes of e-KYC, such masks may be used to defraud facial recognition software.",
+     "page": 9,
+     "source": "search",
+     "query": "e-KYC paragraph 8.10 requirements",
+     "rerank_score": 0.98725766,
+     "requested_sector": "banking"
+    },
+    {
+     "id": "E2",
+     "chunk_id": "3db25895-78f7-5a61-9bd1-3e165982abd4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.9",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.9 (S), p. 7",
+     "text": "S 8.9 In verifying the identity of an individual or beneficial owner under paragraphs 8.10 and 8.13 of this policy document and as required under the AML/CFT/CPF and TFS for FIs policy document, financial institutions shall:\n(i) be satisfied with the identity of the individual or the beneficial owner through reliable and independent documentation, electronic data or any other measures that the financial institution deems necessary;\n(ii) be satisfied with the veracity of information referred to in paragraph 8.9 (i) when verifying the identity of the individual or beneficial owner; and\n(iii) ensure that documents, data or information collected is kept up-to-date and relevant.",
+     "page": 9,
+     "source": "search",
+     "query": "e-KYC paragraph 8.10 requirements",
+     "rerank_score": 0.9723727,
+     "requested_sector": "banking"
+    },
+    {
+     "id": "E3",
+     "chunk_id": "0b7352b8-162b-5a06-b0b5-c2cc63a10d14",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.22",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.22 (S), p. 10",
+     "text": "S 8.22 Financial institutions shall ensure that the technology provider appointed to provide the e-KYC solution conducts the following:\n(i) Ensure that the e-KYC solution, encompassing the three (3) e-KYC modules namely document verification, biometric matching and liveness detection as referenced in paragraph 8.10, has been assessed by a credible 9 external independent assessor in accordance with the scope and criteria as provided in Appendix 3. This includes ensuring that the technology provider has put measures in place to address the gaps or weaknesses identified from such assessment in a timely manner;\n(ii) Ensure that the relevant certification(s) is obtained for the various modules under e-KYC solution, where such certification is available 10 .\n[9] Credible external independent assessor refers to an assessor who has the capability and expertise in conducting assessments on identity verification solutions.\n[10] The modules are biometric matching/facial recognition, liveness test and ID verification. For example, ISO 197945 for facial recognition and ISO 30107-3 for liveness test (presentation attack detection) module.",
+     "page": 12,
+     "source": "search",
+     "query": "e-KYC paragraph 8.10 requirements",
+     "rerank_score": 0.96289706,
+     "requested_sector": "banking"
+    },
+    {
+     "id": "E4",
+     "chunk_id": "6f1b8c9d-7289-5b38-964a-0773abc0628b",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.12",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.12 (G), p. 8",
+     "text": "G 8.12 A financial institution may implement e-KYC to identify and verify legal persons, subject to meeting the requirements in this policy document and the requirements for legal persons specified under the AML/CFT/CPF and TFS for FIs policy document 6 on CDD for legal persons.\n[5] For avoidance of doubt, a sole proprietor is not deemed as legal person under this policy document. Accordingly, the on-boarding of sole proprietors through e-KYC is subject to e-KYC process for individual as specified under paragraph 8.10.\n[6] In particular, requirements relating to legal persons as well as clubs, societies and charities contained within paragraphs 14A.9, 14B.11, 14C.10 and 14D.9 of the AML/CFT/CPF and TFs for FIs Policy Document.",
+     "page": 10,
+     "source": "search",
+     "query": "e-KYC paragraph 8.10 requirements",
+     "rerank_score": 0.94113696,
+     "requested_sector": "banking"
+    },
+    {
+     "id": "E5",
+     "chunk_id": "a80f320a-f4ca-5834-95b1-5a5f1d7042de",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.16",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.16 (S), p. 9",
+     "text": "S 8.16 In relation to paragraph 8.13 (ii), where the identification and verification of the authorised person is conducted via electronic means, a financial institution shall ensure that -\n(i) electronic communication or documents that capture collective decision making by the directors of the legal person (e.g. digital forms of Directors Resolution or Letter of Authority) to appoint the authorised person and establish business relations are maintained in accordance with relevant record keeping requirements as specified under paragraph 24 of the AML/CFT/CPF and TFS for FIs Policy Document;\n(ii) such electronic means adopted to identify and verify the authorised person are within the legal person's constitution or any other document which sets out the powers of the legal person; and\n(iii) the authorised person is identified and verified through e-KYC as an individual, having due regard to the measures listed under paragraph 8.10 of this policy document.",
+     "page": 11,
+     "source": "search",
+     "query": "e-KYC paragraph 8.10 requirements",
+     "rerank_score": 0.9371187,
+     "requested_sector": "banking"
+    },
+    {
+     "id": "E6",
+     "chunk_id": "454ad958-1ca3-5a1b-afdf-e2eaaa17e60d",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.4",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.4 (S), p. 6",
+     "text": "S 8.4 In line with requirements under the AML/CFT/CPF and TFS for FIs policy document, a financial institution shall ensure and be able to demonstrate on a continuing basis that appropriate measures for the identification and verification of a customer's identity through e-KYC are secure and effective. Measures for identification and verification shall be proportionate to the risk dimensions of eKYC.",
+     "page": 8,
+     "source": "lookup",
+     "query": "ekyc:8.4",
+     "rerank_score": null,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ekyc:8.10",
+    "ekyc:8.4"
+   ],
+   "evidence_keys": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.22",
+    "ekyc:8.12",
+    "ekyc:8.16",
+    "ekyc:8.4"
+   ],
+   "citation_recall": 1.0,
+   "evidence_recall": 1.0,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 4,
+   "input_tokens": 5596,
+   "output_tokens": 1060,
+   "latency_ms": 96,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "followup-1",
+   "category": "follow_up",
+   "mode": "traditional",
+   "conversation": "User: Can banks onboard customers without meeting them face to face?\nUser: what about takaful operators?",
+   "standalone_question": "what about takaful operators?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Takaful operators are subject to specific obligations concerning claims investigations and fair settlements, beneficiary PEP checks, the prohibition of unfair discrimination in product offerings, and clear explanations for claim rejections.",
+    "statements": [
+     {
+      "text": "A licensed takaful operator must conduct a thorough and objective investigation of all claims submitted and ensure that settlement offers are fair.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "shall conduct a thorough and objective investigation of all claims submitted",
+      "topic": "claims settlement"
+     },
+     {
+      "text": "Insurance and takaful operators must take reasonable measures to determine whether a beneficiary or beneficial owner is a foreign PEP.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E2"
+      ],
+      "quote": "reporting institutions are required to take reasonable measures to determine whether the beneficiary and/or, where required, the beneficial owner of the beneficiary, is a foreign PEP",
+      "topic": "foreign PEPs"
+     },
+     {
+      "text": "A licensed takaful operator must not unfairly discriminate in takaful products unless justified by sound underwriting or actuarial principles.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E3"
+      ],
+      "quote": "a licensed insurer and a licensed takaful operator shall not",
+      "topic": "unfair discrimination"
+     },
+     {
+      "text": "Upon total or partial rejection of a claim, a licensed takaful operator must provide the financial consumer with a clear explanation of the rationale based on policy terms or exclusions.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E4"
+      ],
+      "quote": "shall provide the financial consumer with a clear explanation of the rationale including the policy terms or exclusions on which the decision is based",
+      "topic": "claim rejection"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "59b15e73-273e-5e5c-a3f4-cb6f0b4b76d1",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "15.6",
+     "provision": "S",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 15.6 (S), p. 34",
+     "text": "S 15.6 For insurance or takaful services or products, a licensed insurer or licensed takaful operator, as the case may be, shall conduct a thorough and objective investigation of all claims submitted. A licensed insurer or licensed takaful operator, as the case may be, shall ensure that the claim settlement offer made to a financial consumer is fair, taking into account relevant factors, and represents the claimant's reasonable entitlement under an insurance policy or takaful certificate.",
+     "page": 35,
+     "source": "search",
+     "query": "what about takaful operators?",
+     "rerank_score": 0.8872437,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "cd84c0f4-054c-5eb2-beb3-fd715a92b015",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "15.2.2",
+     "provision": "S",
+     "sector": null,
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 15.2.2 (S), p. 92",
+     "text": "15.2.2 For insurance and takaful operators, reporting institutions are required to take reasonable measures to determine whether the beneficiary and/or, where required, the beneficial owner of the beneficiary, is a foreign PEP.",
+     "page": 95,
+     "source": "search",
+     "query": "what about takaful operators?",
+     "rerank_score": 0.8670808,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "a823dd3b-c6aa-54c2-a59a-a18460c4ab6d",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "13.10",
+     "provision": "S",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 13.10 (S), p. 26",
+     "text": "S 13.10 For insurance and takaful products, a licensed insurer and a licensed takaful operator shall not-\n(a) make or permit any unfair discrimination between-\n(i) individuals of the same class and equal expectation of life in the premium or contribution rates or policy or certificate fees charged for any life insurance or family takaful certificate and investment-linked insurance policy or takaful certificate, in the bonus or investment profits, other benefits payable or in any other terms and conditions of such policy or certificate;\n(ii) individuals of the same class and of essentially the same hazard in the premium or contribution rates or policy or certificate fees charged for any accident or health insurance policy or takaful certificate, in the benefits payable, or in any other terms and conditions of such policy or certificate; or\n(iii) individuals of the same class and of essentially the same hazard by refusing to insure or provide takaful cover (including making a cover prohibitively expensive), refusing to renew, cancelling or limiting the amount of insurance or takaful coverage on a general insurance or takaful risk;\n(b) refuse to insure or provide takaful cover or continue to insure or provide takaful cover (including making a cover prohibitively expensive), or limit the amount of coverage available to an individual because of gender, marital status, race, religion or national origin of the individual; or\n(c) refuse to insure or provide takaful cover to an individual solely because another licensed insurer or takaful operator has refused to provide insurance or takaful cover, or has cancelled or refused to renew an existing policy or certificate in which that individual was the named insured or participant,\nunless such action can be demonstrated as the result of the application of sound underwriting or actuarial principles.",
+     "page": 27,
+     "source": "search",
+     "query": "what about takaful operators?",
+     "rerank_score": 0.8575773,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "60313a20-9638-5783-b568-8401666001a8",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "15.7",
+     "provision": "S",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 15.7 (S), p. 34",
+     "text": "S 15.7 Where there is a total or partial rejection of an insurance or takaful claim, a licensed insurer or licensed takaful operator, as the case may be, shall provide the financial consumer with a clear explanation of the rationale including the policy terms or exclusions on which the decision is based.",
+     "page": 35,
+     "source": "search",
+     "query": "what about takaful operators?",
+     "rerank_score": 0.8507664,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "4ba08acc-5cad-531c-a5af-ca7159439129",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "10.11",
+     "provision": "S",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 10.11 (S), Poor practices, p. 13",
+     "text": "1. The FSP's remuneration arrangements and practices are based mainly on meeting sales targets and generating revenue, without emphasising on considerations to act in the best interests of financial consumers. For\nexample, lack of explicit conduct indicators in KPIs of senior management as well as criteria to qualify for sales campaign incentives such as persistency rates, quality of customer fact find forms, feedback from welcome calls, past disciplinary actions, and complaints.\n2. The licensed insurer or takaful operator implements a commission structure that does not commensurate with the actual effort or services rendered to financial consumers by its intermediaries, resulting in disproportionate charges to financial consumers and contributing to the depletion of their insurance or takaful fund values.",
+     "page": 14,
+     "source": "search",
+     "query": "what about takaful operators?",
+     "rerank_score": 0.8462476,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ftfc:15.6",
+    "amlcft:15.2.2",
+    "ftfc:13.10",
+    "ftfc:15.7"
+   ],
+   "evidence_keys": [
+    "ftfc:15.6",
+    "amlcft:15.2.2",
+    "ftfc:13.10",
+    "ftfc:15.7",
+    "ftfc:10.11"
+   ],
+   "citation_recall": 0.0,
+   "evidence_recall": 0.0,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1557,
+   "output_tokens": 1695,
+   "latency_ms": 49,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes",
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 1,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "followup-1",
+   "category": "follow_up",
+   "mode": "agentic",
+   "conversation": "User: Can banks onboard customers without meeting them face to face?\nUser: what about takaful operators?",
+   "standalone_question": "Can takaful operators onboard customers without meeting them face to face, and what requirements must they follow?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Licensed family takaful operators may onboard customers without meeting them face to face, provided they obtain Board approval, comply with e-KYC requirements, and maintain secure and effective electronic verification measures.",
+    "statements": [
+     {
+      "text": "Licensed family takaful operators may establish non face-to-face business relationships with customers.",
+      "obligation": "should_or_may",
+      "evidence_ids": [
+       "E5"
+      ],
+      "quote": "Reporting institutions may establish non face-to-face (non-FTF) business relationships with its customers.",
+      "topic": "non-FTF onboarding"
+     },
+     {
+      "text": "Takaful operators must obtain approval from their Board prior to implementing non-face-to-face business relationships.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E4"
+      ],
+      "quote": "Reporting institutions shall obtain approval from their Board prior to the implementation of non-FTF business relationships.",
+      "topic": "board approval"
+     },
+     {
+      "text": "Takaful operators must read non-FTF business relationship requirements together with the e-KYC policy document.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E3"
+      ],
+      "quote": "The requirements on non-FTF business relationship shall be read together with the Electronic Know Your Customer (e-KYC) policy document",
+      "topic": "e-KYC alignment"
+     },
+     {
+      "text": "Takaful operators must be vigilant when establishing and conducting business relationships via electronic channels.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E2"
+      ],
+      "quote": "Reporting institutions are required to be vigilant in establishing and conducting business relationships via electronic means",
+      "topic": "electronic vigilance"
+     },
+     {
+      "text": "Takaful operators must ensure and demonstrate that e-KYC identification and verification measures are secure, effective, and proportionate to risk.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E10"
+      ],
+      "quote": "a financial institution shall ensure and be able to demonstrate on a continuing basis that appropriate measures for the identification and verification of a customer's identity through e-KYC are secure and effective.",
+      "topic": "secure e-KYC measures"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "e5605f80-d318-5787-9dcc-02f0a574105c",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14B.17.9",
+     "provision": "S",
+     "sector": "insurance_takaful",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14B.17.9 (S), p. 59",
+     "text": "S 14B.17.9 In relation to paragraph 14B.17.7, reporting institutions shall take measures to identify and verify the customer's identity through any of the following: (a) establishing independent contact with customer; (b) verifying the customer's information against reliable and independent sources to confirm the customer's identity and identifying any known or suspected ML/TF/PF risks associated with the customer; or (c) requesting, sighting and maintaining records of additional documents required to perform face-to-face customer verifications.",
+     "page": 62,
+     "source": "search",
+     "query": "non face-to-face business relationship requirement",
+     "rerank_score": 0.97360456,
+     "requested_sector": "insurance_takaful"
+    },
+    {
+     "id": "E2",
+     "chunk_id": "02e19f2f-2fc4-5d4a-a6b6-063cec5f0ac9",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14B.17.5",
+     "provision": "S",
+     "sector": "insurance_takaful",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14B.17.5 (S), p. 59",
+     "text": "S 14B.17.5 Reporting institutions are required to be vigilant in establishing and conducting business relationships via electronic means, which includes mobile channel and online channel.",
+     "page": 62,
+     "source": "search",
+     "query": "non face-to-face business relationship requirement",
+     "rerank_score": 0.9671134,
+     "requested_sector": "insurance_takaful"
+    },
+    {
+     "id": "E3",
+     "chunk_id": "2b79a3c7-a0ef-5927-94fd-0d8d370a11e5",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14B.17.2",
+     "provision": "S",
+     "sector": "insurance_takaful",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14B.17.2 (S), p. 58",
+     "text": "S 14B.17.2 The requirements on non-FTF business relationship shall be read together with the Electronic Know Your Customer (e-KYC) policy document and any relevant policy document, guidelines or circulars issued pursuant to the e-KYC policy document.",
+     "page": 61,
+     "source": "search",
+     "query": "non face-to-face business relationship requirement",
+     "rerank_score": 0.965719,
+     "requested_sector": "insurance_takaful"
+    },
+    {
+     "id": "E4",
+     "chunk_id": "e798da01-4bdb-5e6b-89d7-77c6564843e4",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14B.17.3",
+     "provision": "S",
+     "sector": "insurance_takaful",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14B.17.3 (S), p. 58",
+     "text": "S 14B.17.3 Reporting institutions shall obtain approval from their Board prior to the implementation of non-FTF business relationships.",
+     "page": 61,
+     "source": "search",
+     "query": "non face-to-face business relationship requirement",
+     "rerank_score": 0.95970166,
+     "requested_sector": "insurance_takaful"
+    },
+    {
+     "id": "E5",
+     "chunk_id": "544c068b-23fc-5e11-9f85-e853e7b9b72b",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14B.17.1",
+     "provision": "G",
+     "sector": "insurance_takaful",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14B.17.1 (G), p. 58",
+     "text": "G 14B.17.1 Reporting institutions may establish non face-to-face (non-FTF) business relationships with its customers.",
+     "page": 61,
+     "source": "search",
+     "query": "non face-to-face business relationship requirement",
+     "rerank_score": 0.9589395,
+     "requested_sector": "insurance_takaful"
+    },
+    {
+     "id": "E6",
+     "chunk_id": "3db25895-78f7-5a61-9bd1-3e165982abd4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.9",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.9 (S), p. 7",
+     "text": "S 8.9 In verifying the identity of an individual or beneficial owner under paragraphs 8.10 and 8.13 of this policy document and as required under the AML/CFT/CPF and TFS for FIs policy document, financial institutions shall:\n(i) be satisfied with the identity of the individual or the beneficial owner through reliable and independent documentation, electronic data or any other measures that the financial institution deems necessary;\n(ii) be satisfied with the veracity of information referred to in paragraph 8.9 (i) when verifying the identity of the individual or beneficial owner; and\n(iii) ensure that documents, data or information collected is kept up-to-date and relevant.",
+     "page": 9,
+     "source": "search",
+     "query": "electronic know your customer e-KYC policy requirements",
+     "rerank_score": 0.9713038,
+     "requested_sector": "insurance_takaful"
+    },
+    {
+     "id": "E7",
+     "chunk_id": "ce5686c5-8b53-5f53-822b-5a0e4f4311e4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.10",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.10 (G), p. 7",
+     "text": "G 8.10 In identifying and verifying an individual's identity through e-KYC as required under paragraph 8.4 of this policy document and the AML/CFT/CPF and TFS for FIs policy document, a financial institution may undertake measures, including but not limited to the following-\n(i) Document verification - i.e., ensuring that the government issued ID to support e-KYC customer verification is authentic by utilising appropriate fraud detection mechanisms;\n(ii) Biometric matching - i.e., verifying the customer against a government issued ID 3 by utilising biometric technology; and/or\n(iii) Liveness detection - i.e, ensuring the customer is a live subject and not an impersonator (e.g. through use of photos, videos, synthetic human face masks 4 ) by utilising liveness detection.\n[3] i.e, National Registration Identity Card (NRIC), passport, or any other official documents.\n[4] Synthetic human face masks are designed to impersonate real human faces and made from materials such as silicone or otherwise. For purposes of e-KYC, such masks may be used to defraud facial recognition software.",
+     "page": 9,
+     "source": "search",
+     "query": "electronic know your customer e-KYC policy requirements",
+     "rerank_score": 0.9695095,
+     "requested_sector": "insurance_takaful"
+    },
+    {
+     "id": "E8",
+     "chunk_id": "17f7ed5b-94b2-5edc-8781-9d3de81f0fa3",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "5.2",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 5.2, p. 3",
+     "text": "\"customer\" refers to both account holder and non-account holder. The term also refers to a client.\nFor the life insurance and family takaful sector, \"customer\" refers to parties related to an insurance/takaful contract including potential parties such as the proposer/policyholder/policy owner, payor, assignee and company representative, but does not include insurance agent.\nIn the case of group policies, \"customer\" refers to the master policy holder, that is, the owner of the master policy issued or intended to be issued.\nIn addition, for money services business and designated payment instruments, \"customer\" refers to a person for whom the licensee or approved issuer of designated payment instruments undertakes or intends to undertake business relations.\nWhere the term \"customer\" is broadly used in this policy document, requirements shall apply to both individual and legal person.\n\"electronic Know-Your-Customer (e-KYC)\" means establishing business relationships and conducting customer due diligence (CDD) 2 by way of electronic means, including online channel and mobile channels.\n\"financial institution\" refers to-\n(i) a licensed bank, investment bank and life insurer under the FSA;\n(ii) a licensed Islamic bank and licensed family takaful operator under the IFSA;\n(iii) a prescribed development financial institution under the DFIA;\n(iv) an approved issuer of designated payment instruments under the FSA;\n(v) an approved issuer of designated Islamic payment instruments under the IFSA; and\n(vi) a licensed money services business under the MSBA.\n\"False Negative\" refers to identification and verification cases processed under e-KYC solutions in which the solution falsely rejected and did not verify an identity when it should have been accepted. These include cases of genuine identities or documents that were falsely rejected.\n\"False Positive\" refers to identification and verification cases processed under e-KYC solutions in which the solution accepted and verified an identity when said identity should have been rejected. These include cases of false or unclear identities, forged or tampered documents and unclear images that were falsely accepted.\n\"individual\" refers to a natural person.",
+     "page": 5,
+     "source": "search",
+     "query": "electronic know your customer e-KYC policy requirements",
+     "rerank_score": 0.968809,
+     "requested_sector": "insurance_takaful"
+    },
+    {
+     "id": "E9",
+     "chunk_id": "2f208cf1-7e13-5816-9ce8-4af128ea0a9c",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.8",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.8 (G), p. 7",
+     "text": "G 8.8 In respect of paragraph 8.7, a financial institution may give regard to the key basic authentication factors, which namely and amongst others include:\n(i) something the customer possesses (e.g. national identity document such as an identity card, registered mobile number, company's certificate of incorporation);\n(ii) something the customer knows (e.g. PIN, personal information, transaction history); and\n(iii) in the case of individuals, something the customer is (e.g. biometric characteristics).\nAn e-KYC solution that depends on more than one factor is typically more difficult to compromise than a single factor system.",
+     "page": 9,
+     "source": "search",
+     "query": "electronic know your customer e-KYC policy requirements",
+     "rerank_score": 0.96686405,
+     "requested_sector": "insurance_takaful"
+    },
+    {
+     "id": "E10",
+     "chunk_id": "454ad958-1ca3-5a1b-afdf-e2eaaa17e60d",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.4",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.4 (S), p. 6",
+     "text": "S 8.4 In line with requirements under the AML/CFT/CPF and TFS for FIs policy document, a financial institution shall ensure and be able to demonstrate on a continuing basis that appropriate measures for the identification and verification of a customer's identity through e-KYC are secure and effective. Measures for identification and verification shall be proportionate to the risk dimensions of eKYC.",
+     "page": 8,
+     "source": "search",
+     "query": "electronic know your customer e-KYC policy requirements",
+     "rerank_score": 0.9655894,
+     "requested_sector": "insurance_takaful"
+    }
+   ],
+   "cited_keys": [
+    "amlcft:14B.17.5",
+    "amlcft:14B.17.2",
+    "amlcft:14B.17.3",
+    "amlcft:14B.17.1",
+    "ekyc:8.4"
+   ],
+   "evidence_keys": [
+    "amlcft:14B.17.9",
+    "amlcft:14B.17.5",
+    "amlcft:14B.17.2",
+    "amlcft:14B.17.3",
+    "amlcft:14B.17.1",
+    "ekyc:8.9",
+    "ekyc:8.10",
+    "ekyc:5.2",
+    "ekyc:8.8",
+    "ekyc:8.4"
+   ],
+   "citation_recall": 1.0,
+   "evidence_recall": 1.0,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 4,
+   "input_tokens": 6605,
+   "output_tokens": 2783,
+   "latency_ms": 104,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes",
+    "yes",
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "scope-1",
+   "category": "out_of_scope",
+   "mode": "traditional",
+   "conversation": "User: What is the interest rate cap on credit cards?",
+   "standalone_question": "What is the interest rate cap on credit cards?",
+   "expected_outcome": "refuse",
+   "observed_outcome": "refuse",
+   "outcome_correct": true,
+   "status": "not_covered",
+   "answer": {
+    "status": "not_covered",
+    "summary": "The provided policy documents do not contain any information regarding an interest rate cap on credit cards.",
+    "statements": [],
+    "gaps": "Information regarding the interest rate cap on credit cards is not covered in the provided policy documents."
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "0cb4af29-871e-517b-80de-4a88d71d7179",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "12.3",
+     "provision": "S",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 12.3 (S), p. 19",
+     "text": "S 12.3 A FSP shall keep financial consumers adequately informed regarding a financial service or product at the pre-contractual stage, at the point financial consumers enter into a contract and during the term of the contract as stipulated in the Guidelines on Product Transparency and Disclosure 10 to facilitate financial consumers in making informed decisions on the financial service or product that meets their needs. This shall include relevant information on fees and charges applicable to a financial service or product.\n[10] Issued in May 2013, including any amendments or modifications made thereof.",
+     "page": 20,
+     "source": "search",
+     "query": "What is the interest rate cap on credit cards?",
+     "rerank_score": 0.5093739,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "90ff81fb-8da7-50d0-aecd-fc81f98962ad",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "11.4",
+     "provision": "S",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 11.4 (S), p. 15",
+     "text": "S 11.4 A FSP must ensure that terms in its standard contracts are fair to financial consumers. A term is regarded as unfair if it has a tendency to create a significant imbalance, whereby it shifts the rights and obligations significantly in favour of the FSP to the detriment of financial consumers. Whether a term is fair is to be determined by reference to the contract as a whole in light of the circumstances existing when the contract was entered into and by taking into account the nature of the financial service or product involved.",
+     "page": 16,
+     "source": "search",
+     "query": "What is the interest rate cap on credit cards?",
+     "rerank_score": 0.5093739,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "75aacb9f-139e-5b97-870c-4bd8be9e6221",
+     "document": "ftfc",
+     "scope": "Appendix 2",
+     "paragraph_id": "2",
+     "provision": null,
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, Appendix 2, para 2, p. 47",
+     "text": "2. We commit to ensure that customers are provided with fair terms\ni) We will ensure that the terms in our contracts or agreements are fair, transparent, and well communicated to customers;\nii) We will ensure that terms and conditions set out the respective rights, liabilities and obligations clearly and as far as possible in plain language; and\niii) We will ensure that the terms and conditions in contracts or agreements are not altered without prior notification to customers.",
+     "page": 48,
+     "source": "search",
+     "query": "What is the interest rate cap on credit cards?",
+     "rerank_score": 0.5093739,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "63505f41-d95e-5539-99fd-fb25dfe61bb8",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "4.1",
+     "provision": null,
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 4.1, p. 3",
+     "text": "4.1 This Policy Document comes into effect on 27 March 2024, except for the following paragraphs, which will come into effect on 1 April 2025-\n(a) paragraph 8.1(g);\n(b) paragraph 10.3(f);\n(c) paragraph 10.3(g);\n(d) paragraph 10.4; and\n(e) paragraphs 16.1 to 16.28.",
+     "page": 4,
+     "source": "search",
+     "query": "What is the interest rate cap on credit cards?",
+     "rerank_score": 0.5015625,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "d48951a6-8056-507f-8d59-9909a390e036",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "16.10",
+     "provision": "G",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 16.10 (G), p. 40",
+     "text": "G 16.10 Examples of predatory practices referred to in paragraph 16.9 may include:\n(a) enticing financial consumers who are already highly indebted, i.e. have a high debt service ratio and low savings, to take on new loans, particularly unsecured loans;\n(b) promoting credit cards to university students;\n(c) promoting highly complex investment-linked insurance or takaful products to financial consumers with no investment experience; and\n(d) misleading retirees to take higher risk investment-linked insurance or takaful or unit trust products on the basis that such financial products will earn them a higher interest or profit, without explaining the downside risks.",
+     "page": 41,
+     "source": "search",
+     "query": "What is the interest rate cap on credit cards?",
+     "rerank_score": 0.48984516,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [],
+   "evidence_keys": [
+    "ftfc:12.3",
+    "ftfc:11.4",
+    "ftfc:Appendix 2:2",
+    "ftfc:4.1",
+    "ftfc:16.10"
+   ],
+   "citation_recall": null,
+   "evidence_recall": null,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1405,
+   "output_tokens": 328,
+   "latency_ms": 23,
+   "cached": true,
+   "error": null,
+   "verdicts": [],
+   "faithfulness": null,
+   "relevancy": null,
+   "judge_model": null,
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "scope-1",
+   "category": "out_of_scope",
+   "mode": "agentic",
+   "conversation": "User: What is the interest rate cap on credit cards?",
+   "standalone_question": "What is the interest rate cap on credit cards?",
+   "expected_outcome": "refuse",
+   "observed_outcome": "refuse",
+   "outcome_correct": true,
+   "status": "not_covered",
+   "answer": {
+    "status": "not_covered",
+    "summary": "I can only answer questions about three Bank Negara Malaysia policy documents: e-KYC, Fair Treatment of Financial Consumers, and AML/CFT/CPF & TFS for Financial Institutions. This question is outside them.",
+    "statements": [],
+    "gaps": null
+   },
+   "evidence": [],
+   "cited_keys": [],
+   "evidence_keys": [],
+   "citation_recall": null,
+   "evidence_recall": null,
+   "verified": false,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 920,
+   "output_tokens": 167,
+   "latency_ms": 10,
+   "cached": true,
+   "error": null,
+   "verdicts": [],
+   "faithfulness": null,
+   "relevancy": null,
+   "judge_model": null,
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "ambiguous-1",
+   "category": "ambiguous",
+   "mode": "traditional",
+   "conversation": "User: What does para 8.2 say?",
+   "standalone_question": "What does para 8.2 say?",
+   "expected_outcome": "clarify",
+   "observed_outcome": "answer",
+   "outcome_correct": false,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 8.2 across the different policy documents specifies the Board's responsibilities for e-KYC performance, the supersession of the Interoperable Credit Transfer Framework, and examples of conduct consistent with fair outcomes.",
+    "statements": [
+     {
+      "text": "The Board of financial institutions must ensure satisfactory measures are undertaken to maintain an appropriate level of e-KYC performance.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "shall be responsible for ensuring satisfactory measures",
+      "topic": "e-KYC performance"
+     },
+     {
+      "text": "The AML/CFT/CPF and TFS policy document supersedes specific paragraphs and Appendix 2 of the Interoperable Credit Transfer Framework.",
+      "obligation": "information",
+      "evidence_ids": [
+       "E2"
+      ],
+      "quote": "This policy document supersedes paragraphs 10.3, 10.4, 10.5 and Appendix 2",
+      "topic": "superseded framework"
+     },
+     {
+      "text": "Appendix 1 of the Fair Treatment of Financial Consumers policy document provides examples of conduct consistent with fair outcomes.",
+      "obligation": "should_or_may",
+      "evidence_ids": [
+       "E3"
+      ],
+      "quote": "Appendix 1 of this Policy Document provides a non-exhaustive list of examples",
+      "topic": "fair outcomes"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "a1fef334-a6c6-5b02-8cae-3b0a51f386d4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.2",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.2 (S), p. 6",
+     "text": "S 8.2 The Board of financial institutions shall be responsible for ensuring satisfactory measures are undertaken by the financial institution such that an appropriate level of performance of the e-KYC solution is maintained at all times. Such responsibilities of the Board should include but are not limited to ensuring improvements are undertaken by the financial institution to enhance the e-KYC solution in a regular and timely manner, and that the Board is satisfied that the level of performance of the e-KYC solution does not undermine the integrity of the identification and verification process.",
+     "page": 8,
+     "source": "search",
+     "query": "What does para 8.2 say?",
+     "rerank_score": 0.9690442,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "38cc01b3-3bb8-5d7e-a16c-513652fa3319",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "8.2",
+     "provision": null,
+     "sector": null,
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 8.2, p. 17",
+     "text": "8.2 This policy document supersedes paragraphs 10.3, 10.4, 10.5 and Appendix 2 of the Interoperable Credit Transfer Framework issued on 23 December 2019.",
+     "page": 20,
+     "source": "search",
+     "query": "What does para 8.2 say?",
+     "rerank_score": 0.9503373,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "8871d877-c3a9-5bac-a566-a69c4f2ef24c",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "8.2",
+     "provision": "G",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 8.2 (G), p. 8",
+     "text": "G 8.2 Appendix 1 of this Policy Document provides a non-exhaustive list of examples of conduct that is consistent with fair outcomes to financial consumers.",
+     "page": 9,
+     "source": "search",
+     "query": "What does para 8.2 say?",
+     "rerank_score": 0.9474978,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "e31f1f30-353e-5199-91e4-6dd9a5c1f82e",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.21",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.21 (S), p. 10",
+     "text": "S 8.21 For the purposes of paragraph 8.20, in ensuring accuracy of the e-KYC solution, a financial institution shall take steps to minimise the False Acceptance Rates (FAR), defined as \ud835\udc39\ud835\udc4e\ud835\udc59\ud835\udc60\ud835\udc52 \ud835\udc43\ud835\udc5c\ud835\udc60\ud835\udc56\ud835\udc61\ud835\udc56\ud835\udc63\ud835\udc52 (\ud835\udc39\ud835\udc4e\ud835\udc59\ud835\udc60\ud835\udc52 \ud835\udc43\ud835\udc5c\ud835\udc60\ud835\udc56\ud835\udc61\ud835\udc56\ud835\udc63\ud835\udc52 + \ud835\udc47\ud835\udc5f\ud835\udc62\ud835\udc52 \ud835\udc41\ud835\udc52\ud835\udc54\ud835\udc4e\ud835\udc61\ud835\udc56\ud835\udc63\ud835\udc52) \ud835\udc65 100 . In measuring and assessing the FAR, a financial institution shall observe the considerations and requirements listed in Appendix 2 8 .\n[8] For avoidance of doubt, requirements for FAR within this policy document do not apply to e-KYC solutions where verification of customer identity is automated without the use of artificial intelligence, machine learning or other similar forms of predictive algorithms.",
+     "page": 12,
+     "source": "search",
+     "query": "What does para 8.2 say?",
+     "rerank_score": 0.86640406,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "fb03103a-1354-5f46-ac13-d5f5bf75f371",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.26",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.26 (G), p. 11",
+     "text": "G 8.26 Notwithstanding paragraphs 8.19 to 8.21, a financial institution may also perform e-KYC where identification and verification is conducted solely by a human representative. This includes cases where the decision to verify a customer is conducted by a financial institution representative, intermediary or insurance agent, with the assistance of electronic means such as video calls using mobile devices.",
+     "page": 13,
+     "source": "search",
+     "query": "What does para 8.2 say?",
+     "rerank_score": 0.82592696,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ekyc:8.2",
+    "amlcft:8.2",
+    "ftfc:8.2"
+   ],
+   "evidence_keys": [
+    "ekyc:8.2",
+    "amlcft:8.2",
+    "ftfc:8.2",
+    "ekyc:8.21",
+    "ekyc:8.26"
+   ],
+   "citation_recall": null,
+   "evidence_recall": null,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1290,
+   "output_tokens": 1411,
+   "latency_ms": 55,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "ambiguous-1",
+   "category": "ambiguous",
+   "mode": "agentic",
+   "conversation": "User: What does para 8.2 say?",
+   "standalone_question": "Which policy document are you referring to for paragraph 8.2 (e-KYC, Fair Treatment of Financial Consumers, or AML/CFT/CPF)?",
+   "expected_outcome": "clarify",
+   "observed_outcome": "clarify",
+   "outcome_correct": true,
+   "status": "not_covered",
+   "answer": {
+    "status": "not_covered",
+    "summary": "Paragraph 8.2 appears in multiple policy documents (e-KYC, Fair Treatment of Financial Consumers, and AML/CFT/CPF). Could you please specify which document you are referring to?",
+    "statements": [],
+    "gaps": null
+   },
+   "evidence": [],
+   "cited_keys": [],
+   "evidence_keys": [],
+   "citation_recall": null,
+   "evidence_recall": null,
+   "verified": false,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 919,
+   "output_tokens": 246,
+   "latency_ms": 87,
+   "cached": true,
+   "error": null,
+   "verdicts": [],
+   "faithfulness": null,
+   "relevancy": null,
+   "judge_model": null,
+   "self_judged": false,
+   "cross_check_verdicts": []
+  }
+ ]
+}

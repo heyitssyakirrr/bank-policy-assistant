@@ -490,6 +490,23 @@ Recorded here so the plan stays the source of truth:
   its conversation. The UI reads settings from `app/core/config.py` and
   talks to the API over HTTP only. `scripts/screenshot_ui.py` (Playwright,
   dev only) checks the flow in a real browser.
+- **Evaluation details (M5):**
+  - gold labels are paragraph keys, `ekyc:8.4` or `ekyc:Appendix 2:13`
+    (appendices reuse numbers); `python -m evals.golden --check/--show`;
+    who checked what is recorded in `evals/golden_review.yaml` and printed
+    in every report;
+  - every retrieval stage is scored on its first 5 chunks with MRR@5, so
+    the stages are compared on equal terms; the report lists every item a
+    stage made worse, with its top 5 before and after;
+  - a crash or model outage is an `error` outcome, reported apart, never a
+    correct refusal;
+  - the judge sees the user's own conversation (earlier turns + question),
+    never the system's rewrite; it writes its reason before each verdict;
+    "must" where the passage says "may" is "no"; statement numbers that
+    don't match 1..n leave the answer unjudged; the cross-check sample is
+    stratified by category and stops at the first quota refusal;
+  - results are saved after each phase; the Evaluation page shows the
+    latest full run first.
 - **Response cache keys** are `<namespace>:<hash>` (llm, embed_query,
   rerank), so a run can report its real API calls per kind (cache misses).
 
@@ -704,9 +721,13 @@ reviews the demo, then learns from `docs/LEARNING_GUIDE.md` and
 small smoke checks (≤ 30 calls per milestone). When an evaluation is ready,
 it stops and tells him the command, the estimated calls, and whether to run
 now or after the 3 pm reset. Rules of thumb:
-- One full evaluation run uses about 575 Gemini calls. Both Lite models
-  together allow about 1,000 a day, and the quota resets at 3 pm Malaysia
-  time.
+- One full evaluation run is expected to use about 160 calls on
+  gemini-3.1-flash-lite (planner, reviewer, judge), 100 on
+  gemini-3.5-flash-lite (generator) and 15 on gemini-3.8-flash (judge
+  cross-check): `python -m evals.run --full --estimate` prints the current
+  figures (revised 24 Oct from "about 575", measured on the smoke runs).
+  Both Lite models together allow about 1,000 a day, and the quota resets
+  at 3 pm Malaysia time.
 - Start a full run right after a reset, so the run doesn't stop halfway.
 - On the day before the demo, keep **≥ 250 calls** unused for rehearsal and
   the live demo.

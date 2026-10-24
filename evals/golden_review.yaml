@@ -1,0 +1,11 @@
+# Who checked the golden set, printed in every evaluation report (PROJECT_PLAN §8.2 step 4).
+#
+# claude_code: items whose gold paragraphs Claude Code re-read in full against the question
+#              (python -m evals.golden --show ID), after writing them.
+# syakir:      items Syakir spot-checked against the PDFs. Add each ID you check
+#              (aim for at least 10), and note any you changed.
+
+claude_code: [lookup-1, lookup-2, lookup-3, lookup-4, fact-1, fact-2, fact-3, fact-4, fact-5, fact-6, fact-7,
+  fact-8, fact-9, fact-10, compare-1, compare-2, compare-3, compare-4, compare-5, compare-6, xref-1, xref-2,
+  xref-3, xref-4, sector-1, sector-2, sector-3, sector-4, followup-1, followup-2, followup-3, followup-4]
+syakir: []

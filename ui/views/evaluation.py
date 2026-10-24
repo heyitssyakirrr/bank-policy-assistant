@@ -9,6 +9,9 @@ reports = sorted(settings.eval_results_dir.glob("*/report.md"))
 if not reports:
     st.info("No evaluation has been run yet. Run `python -m evals.run --smoke`, then reload this page.")
 else:
-    latest = reports[-1]
-    st.caption(f"Run: {latest.parent.name} · {len(reports)} run(s) so far")
-    st.markdown(latest.read_text(encoding="utf-8"))
+    # A partial re-run ("--only") must not hide the last full evaluation: full runs come first.
+    full = [r for r in reports if r.parent.name.endswith("-full")]
+    ordered = [*reversed(full), *(r for r in reversed(reports) if r not in full)]
+    chosen = st.selectbox("Run", ordered, format_func=lambda path: path.parent.name)
+    st.caption(f"{len(reports)} run(s) so far; full runs are listed first")
+    st.markdown(chosen.read_text(encoding="utf-8"))

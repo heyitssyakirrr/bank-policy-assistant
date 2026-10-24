@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -67,7 +68,23 @@ class Settings(BaseSettings):
     api_url: str = "http://localhost:8000"  # http://api:8000 inside Docker
     public_api_url: str = "http://localhost:8000"
 
+    # --- LangSmith tracing (optional): every node, prompt, token count and latency
+    langsmith_tracing: bool = False
+    langsmith_api_key: str = ""
+    langsmith_project: str = "bank-policy-assistant"
+
     log_level: str = "INFO"
 
 
 settings = Settings()
+
+
+def enable_tracing(config: Settings = settings) -> bool:
+    """LangChain reads its LANGSMITH_* variables from the process environment
+    itself, so this hands it our settings (from .env) once at startup."""
+    if not (config.langsmith_tracing and config.langsmith_api_key):
+        return False
+    os.environ["LANGSMITH_TRACING"] = "true"
+    os.environ["LANGSMITH_API_KEY"] = config.langsmith_api_key
+    os.environ["LANGSMITH_PROJECT"] = config.langsmith_project
+    return True
