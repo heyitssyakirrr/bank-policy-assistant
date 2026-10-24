@@ -361,7 +361,8 @@ docker compose up --build
    `python -m evals.run --only <ids>` (cached calls are free), and record
    everything. Then M8 and M9.
 3. **Teaching mode.** Syakir wants to understand everything before the
-   demo (Mon 26 Oct). When he types `/tour`, walk him through Part A one
+   demo (Mon 26 Oct). When he types `/tour`, follow .claude/skills/tour: first the
+   concept ladder (PROJECT_PLAN §11) from one LLM call upwards, then Part A one
    section at a time: show the real file and lines, run the free commands
    with him, ask the check-yourself questions, and wait for his answer
    before moving on. Use `/explain` style for any concept (CLAUDE.md
