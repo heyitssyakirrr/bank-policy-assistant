@@ -1,0 +1,7 @@
+# What the tests need (CI and local): the runtime, plus docling-core's document
+# types for the ingestion tests. Full Docling (torch, OCR models) is not needed.
+-r requirements.txt
+docling-core==2.101.1
+pyyaml==6.0.3
+pytest==9.1.1
+ruff==0.17.0

@@ -35,7 +35,8 @@ set up, what to type, when to check in, and how to learn afterwards.
 3. **Check that `.env` has** `GEMINI_API_KEY` and `COHERE_API_KEY`. Add
    `LANGSMITH_API_KEY` if you want tracing (free account at
    smith.langchain.com).
-4. **Start Docker Desktop,** then run `docker compose up -d`.
+4. **Start Docker Desktop,** then run `docker compose up -d db qdrant` (the databases
+   only; `docker compose up --build` starts the whole app in Docker).
 5. **Activate the venv** (so the hook and the tests use the right Python),
    then **start Claude Code:**
    ```powershell

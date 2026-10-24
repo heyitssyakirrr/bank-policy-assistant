@@ -5,6 +5,7 @@ Docker, no network and no API key, and still exercise the real Qdrant
 client: the same calls the indexer makes against the server.
 """
 
+import gzip
 import hashlib
 import math
 
@@ -12,7 +13,7 @@ import pytest
 from qdrant_client import QdrantClient
 
 from app.db.vector_repository import VectorRepository
-from app.ingestion.indexer import EmbeddingCache, index_chunks
+from app.ingestion.indexer import EmbeddingCache, index_chunks, uncached_count, write_snapshot
 from app.services.bm25_encoder import Bm25Encoder, term_id, tokenize
 from tests.test_ingestion import APPENDIX, FTFC_CALLOUT, FTFC_SPEC, MAIN_BODY, SPEC, chunks_for, chunks_for_spec
 
@@ -203,3 +204,18 @@ def test_rate_limiter_waits_for_the_next_minute():
     now[0] += 1
     limiter.acquire(items=50, tokens=1000)  # 150 > 100 -> must wait for the window to reset
     assert slept and 58 <= slept[0] <= 60
+
+
+def test_require_cached_counts_chunks_that_would_need_gemini(tmp_path):
+    cache = EmbeddingCache(tmp_path / "cache.jsonl")
+    cache.add_many(["h1"], [[0.1] * DIM])
+    chunks = [{"content_hash": "h1"}, {"content_hash": "h2"}, {"content_hash": "h2"}]
+    assert uncached_count(chunks, cache) == 2
+    assert uncached_count(chunks[:1], cache) == 0
+
+
+def test_snapshot_is_a_gzip_copy_docker_can_index_from(tmp_path):
+    source = tmp_path / "chunks.jsonl"
+    source.write_text('{"chunk": 1}\n', encoding="utf-8")
+    target = write_snapshot(source)
+    assert target.name == "chunks.jsonl.gz" and gzip.decompress(target.read_bytes()) == source.read_bytes()

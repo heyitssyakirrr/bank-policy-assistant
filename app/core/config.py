@@ -81,8 +81,11 @@ settings = Settings()
 
 def enable_tracing(config: Settings = settings) -> bool:
     """LangChain reads its LANGSMITH_* variables from the process environment
-    itself, so this hands it our settings (from .env) once at startup."""
+    itself, so this hands it our settings (from .env) once at startup, and
+    switches tracing off explicitly when it isn't fully configured (a
+    container's env_file could otherwise turn it on without a key)."""
     if not (config.langsmith_tracing and config.langsmith_api_key):
+        os.environ["LANGSMITH_TRACING"] = "false"
         return False
     os.environ["LANGSMITH_TRACING"] = "true"
     os.environ["LANGSMITH_API_KEY"] = config.langsmith_api_key

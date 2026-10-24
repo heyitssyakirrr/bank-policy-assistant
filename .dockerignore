@@ -1,0 +1,18 @@
+# Only what a clean clone has goes into the image: never secrets, caches or local data.
+.env
+.env.*
+.git
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+docs
+tests
+scripts
+app/data/debug
+app/data/interim/*
+!app/data/interim/embeddings
+app/data/interim/embeddings/*
+!app/data/interim/embeddings/*.jsonl.gz
+app/data/processed/*
+!app/data/processed/chunks.jsonl.gz

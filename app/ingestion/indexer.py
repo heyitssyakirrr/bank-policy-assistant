@@ -2,6 +2,11 @@
 
     python -m app.ingestion.indexer              # sync Qdrant with chunks.jsonl
     python -m app.ingestion.indexer --recreate   # drop and rebuild the collection
+    python -m app.ingestion.indexer --require-cached   # Docker bootstrap: cache only, never call Gemini
+
+After a complete host sync, the gzipped snapshots that Docker indexes from
+(chunks.jsonl.gz, the embedding cache .gz) are rewritten, so a later
+`docker compose up` can never roll Qdrant back to an older version.
 
 What one run does
 -----------------
@@ -23,8 +28,10 @@ shape production indexing jobs use; only the scale differs.
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import logging
+import shutil
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -75,6 +82,22 @@ class EmbeddingCache:
             for content_hash, vector in zip(hashes, vectors, strict=True):
                 self._vectors[content_hash] = vector
                 handle.write(json.dumps({"h": content_hash, "v": vector}) + "\n")
+
+
+QDRANT_WAIT_ATTEMPTS = 15  # x 2 s: Qdrant can take a few seconds to load an existing collection
+
+
+def uncached_count(chunks: list[dict], cache: EmbeddingCache) -> int:
+    """Chunks that would need a Gemini call (--require-cached refuses if > 0)."""
+    return sum(1 for c in chunks if c["content_hash"] not in cache)
+
+
+def write_snapshot(source: Path) -> Path:
+    """source.jsonl -> source.jsonl.gz (the committed copy Docker indexes from)."""
+    target = source.with_suffix(".jsonl.gz")
+    with source.open("rb") as raw, gzip.open(target, "wb", compresslevel=9) as packed:
+        shutil.copyfileobj(raw, packed)
+    return target
 
 
 def load_chunks(path: Path) -> list[dict]:
@@ -168,6 +191,11 @@ def main() -> None:
     cli = argparse.ArgumentParser(description="Embed chunks.jsonl and sync it into Qdrant.")
     cli.add_argument("--chunks", type=Path, default=CHUNKS_PATH)
     cli.add_argument("--recreate", action="store_true", help="drop and rebuild the Qdrant collection")
+    cli.add_argument(
+        "--require-cached",
+        action="store_true",
+        help="index from the embedding cache only; abort instead of calling Gemini (Docker bootstrap)",
+    )
     args = cli.parse_args()
     setup_logging(settings.log_level)
 
@@ -179,15 +207,22 @@ def main() -> None:
     started = time.perf_counter()
     chunks = load_chunks(args.chunks)
     cache = EmbeddingCache(CACHE_DIR / f"{emb.EMBEDDING_MODEL}-{emb.OUTPUT_DIMENSIONALITY}.jsonl")
+    uncached = uncached_count(chunks, cache)
+    if args.require_cached and uncached:
+        raise SystemExit(f"{uncached} chunks have no cached embedding; --require-cached refuses to call Gemini.")
     client = QdrantClient(url=settings.qdrant_url)
-    try:
-        client.get_collections()  # cheap reachability check
-    except Exception as exc:
-        raise SystemExit(
-            f"Can't reach Qdrant at {settings.qdrant_url} ({type(exc).__name__}).\n"
-            "Start it with: docker compose up -d   then check "
-            f"{settings.qdrant_url}/dashboard opens in a browser."
-        ) from exc
+    for attempt in range(1, QDRANT_WAIT_ATTEMPTS + 1):
+        try:
+            client.get_collections()  # cheap reachability check
+            break
+        except Exception as exc:
+            if attempt == QDRANT_WAIT_ATTEMPTS:
+                raise SystemExit(
+                    f"Can't reach Qdrant at {settings.qdrant_url} ({type(exc).__name__}).\n"
+                    "Start it with: docker compose up -d db qdrant   then check "
+                    f"{settings.qdrant_url}/dashboard opens in a browser."
+                ) from exc
+            time.sleep(2)
     repo = VectorRepository(client, settings.qdrant_collection)
 
     report = index_chunks(
@@ -199,6 +234,9 @@ def main() -> None:
         embedding_model=emb.EMBEDDING_MODEL,
         recreate=args.recreate,
     )
+    if not args.require_cached and not report.not_yet_embedded and args.chunks == CHUNKS_PATH:
+        for snapshot in (write_snapshot(args.chunks), write_snapshot(cache.path)):
+            print(f"snapshot for Docker: {snapshot} (commit it with the code)")
     if report.not_yet_embedded:
         print(
             f"\nINCOMPLETE: {report.not_yet_embedded} chunks have no embedding yet and are not searchable.\n"

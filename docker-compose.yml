@@ -1,3 +1,24 @@
+# One command starts everything:  docker compose up --build
+#   db       Postgres: chat history, audit log, LangGraph checkpoints
+#   qdrant   the vector index (1,219 chunks: dense + BM25)
+#   index    one-off: rebuilds Qdrant from the committed chunks + embedding cache (zero API calls)
+#   api      FastAPI (migrations first), http://localhost:8000
+#   ui       Streamlit, http://localhost:8501
+# Keys come from .env (GEMINI_API_KEY, COHERE_API_KEY; see .env.example). Needs Compose 2.24+.
+# Host ports can be moved, e.g. API_PORT=8100 UI_PORT=8601 docker compose up.
+# Local development (API and UI run from the venv):  docker compose up -d db qdrant
+# Docker indexes the committed embedding model only (gemini-embedding-001, 768 dims).
+
+x-app: &app
+  build: .
+  image: bank-policy-assistant:latest
+  env_file:
+    - path: ${ENV_FILE:-.env}
+      required: false
+  environment: &app-env
+    DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/bankpolicy
+    QDRANT_URL: http://qdrant:6333
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -7,20 +28,73 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: bankpolicy
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"   # this machine only: default credentials
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bankpolicy"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
 
-  # Vector database for the policy chunks (dense + BM25 vectors).
-  # Postgres stays for chat sessions/messages.
   qdrant:
     image: qdrant/qdrant:v1.19.1          # pinned: keep in step with qdrant-client in requirements.txt
     restart: unless-stopped
     ports:
-      - "6333:6333"                       # REST API + web dashboard: http://localhost:6333/dashboard
-      - "6334:6334"                       # gRPC (faster client protocol, optional)
+      - "127.0.0.1:${QDRANT_PORT:-6333}:6333"   # REST + dashboard (http://localhost:6333/dashboard); no auth
     volumes:
       - qdrant_data:/qdrant/storage       # survives container restarts
+    healthcheck:                          # the image has bash but no curl
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/6333 && printf 'GET /readyz HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q 200 <&3"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  index:
+    <<: *app
+    command: >
+      sh -c "gunzip -kf app/data/processed/chunks.jsonl.gz
+      && for f in app/data/interim/embeddings/*.jsonl.gz; do gunzip -kf $$f; done
+      && python -m app.ingestion.indexer --require-cached"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      index:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  ui:
+    <<: *app
+    command: streamlit run ui/app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true --browser.gatherUsageStats false
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      API_URL: http://api:8000
+      PUBLIC_API_URL: http://localhost:${API_PORT:-8000}
+    ports:
+      - "${UI_PORT:-8501}:8501"
+    volumes:
+      - ./evals/results:/srv/evals/results:ro   # the Evaluation page shows runs made after the build
+    depends_on:
+      api:
+        condition: service_healthy
 
 volumes:
   pgdata:

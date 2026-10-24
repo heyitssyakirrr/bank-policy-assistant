@@ -26,8 +26,9 @@ from app.agent.schemas import DISCLAIMER, SECTOR_LABELS
 from app.agent.state import AgentContext, turn_input
 from app.agent.steps import describe_step
 from app.agent.traditional import build_traditional_graph
-from app.core.config import settings
+from app.core.config import enable_tracing, settings
 from app.core.logging import setup_logging
+from app.core.pii import mask_pii
 from app.llm.cache import ResponseCache
 from app.llm.models import ChatModelClient
 from app.services.search_service import build_search_service
@@ -69,6 +70,7 @@ def main() -> None:
     cli.add_argument("--no-cache", action="store_true", help="don't read or write the response cache")
     args = cli.parse_args()
     setup_logging("WARNING")
+    enable_tracing()
     sys.stdout.reconfigure(encoding="utf-8")  # the Windows console defaults to cp1252
 
     cache = None if args.no_cache else ResponseCache(settings.response_cache_path)
@@ -78,7 +80,8 @@ def main() -> None:
     config = {"configurable": {"thread_id": "cli"}}
     sector = None if args.sector == "all" else args.sector
 
-    for question in [" ".join(args.question), *args.follow_up]:
+    for typed in [" ".join(args.question), *args.follow_up]:
+        question = mask_pii(typed).text  # before Gemini and LangSmith, as the API does
         print(f"\nQ: {question}  ({args.mode})")
         started = time.perf_counter()
         for chunk in graph.stream(turn_input(question, sector), config, context=context, stream_mode="updates"):

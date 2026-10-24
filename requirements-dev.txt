@@ -1,5 +1,4 @@
-# Everything, plus tools for tests and linting
+# Everything: offline ingestion, tests and linting, UI screenshots
 -r requirements-ingest.txt
-pytest
-ruff
+-r requirements-ci.txt
 playwright==1.64.1   # scripts/screenshot_ui.py; then: playwright install chromium

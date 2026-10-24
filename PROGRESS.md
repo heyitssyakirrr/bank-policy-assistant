@@ -5,9 +5,9 @@
 
 **Last updated:** 2026-10-24
 **Goal:** live Streamlit demo of the agentic RAG, **Mon 26 Oct 2026**
-**Current step:** M6, packaging (autonomous build by Claude Code; see
-PROJECT_PLAN.md §10)
-**Tests:** 285 passing
+**Current step:** M7, first full evaluation: **Syakir runs it** (see
+"Next action" below)
+**Tests:** 287 passing
 **Repo:** _(add your GitHub link)_
 
 ---
@@ -24,8 +24,8 @@ DONE ████████████████████  M2  LangGraph
 DONE ████████████████████  M3  Postgres memory + audit + FastAPI
 DONE ████████████████████  M4  Streamlit UI
 DONE ████████████████████  M5  Golden set + evaluation harness
-NEXT ░░░░░░░░░░░░░░░░░░░░  M6  Docker, CI, LangSmith
-     ░░░░░░░░░░░░░░░░░░░░  M7–M9  Evaluation runs, fixes, docs, freeze
+DONE ████████████████████  M6  Docker, CI, LangSmith
+NEXT ░░░░░░░░░░░░░░░░░░░░  M7–M9  Evaluation runs, fixes, docs, freeze
 ```
 
 **What exists** is the *retrieval engine*: give it a question and it returns
@@ -92,7 +92,15 @@ packaging.
   first. Reviewed by code-reviewer: 11 major-ish + 8 minor findings, all
   fixed (gold labels corrected: fact-6, compare-2/4/5/6, fact-3).
 - [ ] **Syakir:** spot-check ≥ 10 golden-set items against the PDFs
-- [ ] M6 Docker (index from committed cache), `.env.example`, LangSmith, CI
+- [x] M6 Docker (index from committed cache), `.env.example`, LangSmith, CI
+  (24 Oct). Dockerfile (one image, non-root), docker-compose.yml (db,
+  qdrant with healthcheck, index bootstrap, api, ui), `.dockerignore`,
+  committed `chunks.jsonl.gz` + embedding cache `.gz`, `indexer
+  --require-cached` + snapshot rewrite, `.env.example`, LangSmith settings,
+  `.github/workflows/ci.yml` + `requirements-ci.txt`. Clean-clone check
+  passed twice (0 embedding calls, API healthy, UI 200, one real question
+  answered). Reviewed by code-reviewer: 4 major + 9 minor findings, all
+  fixed.
 - [ ] M7 Evaluation #1 (**Syakir runs it** when Claude Code says ready) + fixes
 - [ ] M8 Docs: README, architecture, investigation, testing, demo script,
       BUILD_REPORT, LEARNING_GUIDE
@@ -169,8 +177,13 @@ bank-policy-assistant/
 - Windows, Python 3.12, `.venv`, PowerShell. Extract zips with
   `Expand-Archive -Path <zip> -DestinationPath . -Force` (not "Extract All",
   which creates a subfolder).
-- Docker Desktop must be running before `docker compose up -d` (enable "start
-  at login").
+- Docker Desktop must be running first (enable "start at login").
+  - Local development: `docker compose up -d db qdrant` (databases only),
+    then the API and UI from the venv.
+  - Whole app in Docker: `docker compose up --build` (needs Compose 2.24+);
+    it uses ports 8000 and 8501, so stop a local uvicorn/streamlit first.
+  - After re-running the indexer on the host, commit the rewritten
+    `app/data/processed/chunks.jsonl.gz` and the embedding cache `.gz`.
 - Postgres driver: `psycopg[binary]` v3, with `DATABASE_URL` starting
   `postgresql+psycopg://`.
 - Keys in `.env` only (never committed): `GEMINI_API_KEY`, `COHERE_API_KEY`;
@@ -206,6 +219,16 @@ bank-policy-assistant/
 ---
 
 ## Decisions log (why things are the way they are)
+
+**Autonomous build, M6 (2026-10-24)**
+- See PROJECT_PLAN §5.7 "Packaging". The reviewer found that pytest could
+  upload fake runs to LangSmith when tracing is on in `.env`, that the
+  index job raced Qdrant's start, that every `docker compose up` would roll
+  Qdrant back to the committed snapshot, and that `ask.py` traced
+  unmasked questions; all fixed.
+- `.env.example` was regenerated from the settings without reading the old
+  file (reading `.env*` is blocked); Syakir should check nothing he added is
+  missing.
 
 **Autonomous build, M5 (2026-10-24)**
 - See PROJECT_PLAN §5.7 "Evaluation details". Corrected gold labels after

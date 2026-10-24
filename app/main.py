@@ -30,7 +30,7 @@ from app.api.deps import Services
 from app.api.routes import chat, conversations, documents, feedback, health
 from app.api.routes.health import readiness
 from app.api.runner import TurnRunner, index_version
-from app.core.config import settings
+from app.core.config import enable_tracing, settings
 from app.core.logging import RequestContextMiddleware, setup_logging
 from app.db.audit_repository import AuditRepository
 from app.db.session import database_ok, make_engine, make_session_factory, psycopg_url
@@ -40,7 +40,9 @@ from app.services.search_service import build_search_service
 
 
 def build_services(resources: ExitStack) -> Services:
-    """The real stack. No response cache: a live user always gets a fresh answer."""
+    """The real stack. No response cache: a live user always gets a fresh answer.
+    Tracing starts here, not at import, so tests never send runs to LangSmith."""
+    enable_tracing()
     engine = make_engine()
     resources.callback(engine.dispose)
     audit = AuditRepository(make_session_factory(engine))

@@ -507,6 +507,25 @@ Recorded here so the plan stays the source of truth:
     stratified by category and stops at the first quota refusal;
   - results are saved after each phase; the Evaluation page shows the
     latest full run first.
+- **Packaging (M6):**
+  - one image runs three services (index bootstrap, api, ui) instead of a
+    separate UI image: built once, always in step;
+  - the committed `chunks.jsonl.gz` and embedding-cache `.gz` are unpacked
+    by the `index` job, which runs `indexer --require-cached` (it refuses
+    to call Gemini) after Qdrant's healthcheck passes; the API runs
+    `alembic upgrade head` first; the UI calls `API_URL` (inside Docker)
+    and links PDFs through `PUBLIC_API_URL` (the browser's address);
+  - a complete host indexer run rewrites both `.gz` snapshots, so a later
+    `docker compose up` can't roll Qdrant back; for local development only
+    the databases run in Docker (`docker compose up -d db qdrant`);
+  - Postgres and Qdrant bind to 127.0.0.1 (default credentials, no auth);
+    the containers run as a non-root user; host ports and the `.env` path
+    are variables (`API_PORT`, `UI_PORT`, `ENV_FILE`, ...);
+  - LangSmith tracing starts with the real API stack only (never in
+    pytest) and is switched off explicitly when not configured; questions
+    are PII-masked before any trace (API and `scripts/ask.py`);
+  - CI installs `requirements-ci.txt` (runtime + docling-core + pinned
+    pytest/ruff), not full Docling and torch.
 - **Response cache keys** are `<namespace>:<hash>` (llm, embed_query,
   rerank), so a run can report its real API calls per kind (cache misses).
 
