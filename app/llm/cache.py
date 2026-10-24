@@ -15,13 +15,16 @@ import hashlib
 import json
 import sqlite3
 import threading
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
 
 def cache_key(namespace: str, model: str, payload: Any) -> str:
+    """'<namespace>:<hash>': the namespace ("llm", "embed_query", "rerank")
+    lets the cache count real API calls (misses) per kind of call."""
     raw = json.dumps([namespace, model, payload], sort_keys=True, ensure_ascii=False, default=str)
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return f"{namespace}:{hashlib.sha256(raw.encode('utf-8')).hexdigest()}"
 
 
 class ResponseCache:
@@ -34,12 +37,14 @@ class ResponseCache:
             self._conn.commit()
         self.hits = 0
         self.misses = 0
+        self.misses_by_namespace: Counter[str] = Counter()  # each miss becomes one real API call
 
     def get(self, key: str) -> Any | None:
         with self._lock:
             row = self._conn.execute("SELECT value FROM responses WHERE key = ?", (key,)).fetchone()
             if row is None:
                 self.misses += 1
+                self.misses_by_namespace[key.split(":", 1)[0]] += 1
                 return None
             self.hits += 1
             return json.loads(row[0])

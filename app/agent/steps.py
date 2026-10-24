@@ -58,10 +58,12 @@ def describe_step(node: str, update: dict[str, Any]) -> list[str]:
             lines = [f"Writing answer: {answer.status.replace('_', ' ')}, {len(answer.statements)} statements"]
         case "verify_answer":
             report = update["verifications"][-1]
-            if report.passed:
-                lines = ["Citations verified ✓"]
+            if update.get("feedback") and report.passed:
+                lines = [f"Answer misses a cross-referenced passage ({report.incomplete[0].detail}): regenerating"]
             elif update.get("feedback"):
                 lines = [f"Verification found {len(report.serious)} problem(s): regenerating"]
+            elif report.passed:
+                lines = ["Citations verified ✓"]
             else:
                 lines = [f"Verification found {len(report.serious)} problem(s): unverified statements removed"]
         case "respond_directly":

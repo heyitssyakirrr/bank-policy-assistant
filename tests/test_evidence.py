@@ -1,6 +1,8 @@
 """Evidence labelling, merging across searches, and the prompt blocks."""
 
-from app.agent.evidence import format_evidence, merge_evidence, to_evidence
+import pytest
+
+from app.agent.evidence import cross_reference_ids, format_evidence, merge_evidence, to_evidence
 from app.agent.prompts import generator_messages
 from tests.fakes import candidate, payload
 
@@ -58,3 +60,28 @@ def test_generator_prompt_includes_sector_and_feedback():
     assert "insurers and takaful operators" in user.content and user.content.endswith("fix the quote")
     assert "all sectors" in generator_messages("Q?", evidence, None)[1].content
     assert "DATA" in system.content  # the prompt-injection rule is always present
+
+
+def test_a_passage_referring_to_another_given_passage_says_so():
+    e810 = candidate("e810", payload("8.10", "G 8.10 as required under paragraph 8.4 of this policy", provision="G"))
+    e84 = candidate("e84", payload("8.4", "S 8.4 shall ensure measures are secure"))
+    ftfc84 = candidate("f84", payload("8.4", "S 8.4 fair treatment", doc="ftfc"))
+    block = format_evidence(labelled(e810, e84, ftfc84))
+    assert "[E1] ekyc para 8.10 (G), p. 6\nCross-reference: E2 (para 8.4)\n" in block  # same document only
+    assert "Cross-reference" not in block.split("[E2]")[1]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("G 8.10 as required under paragraph 8.4 of this policy document", {"8.4"}),
+        ("S 8.16 In relation to paragraph 8.13 (ii), where the authorised person", {"8.13"}),
+        ("in relation to paragraphs 14A.9.4, 14A.9.5 and 14A.9.6, institutions", {"14A.9.4", "14A.9.5", "14A.9.6"}),
+        ("S 10.1 Subject to paragraphs 8.1 to 8.3, where a licensed person", {"8.1", "8.3"}),
+        ("as specified under paragraph 6.2 of the AML/CFT/CPF and TFS for FIs policy document", set()),
+        ("as required under paragraph 6.2 of the AML/CFT policy document", set()),  # another document
+        ("G 8.26 Notwithstanding paragraphs 8.19 to 8.21, a financial institution may", set()),  # a mention
+    ],
+)
+def test_cross_reference_ids(text, expected):
+    assert cross_reference_ids(text) == expected

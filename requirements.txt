@@ -20,3 +20,6 @@ langchain-google-genai==4.4.2
 langgraph-checkpoint-postgres==3.2.0
 psycopg-pool==3.3.3
 alembic==1.20.1
+# Streamlit UI (talks to the API over HTTP only)
+streamlit==1.66.1
+httpx==0.28.1

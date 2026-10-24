@@ -42,11 +42,16 @@ class Settings(BaseSettings):
     reviewer_fallback_model: str = "google_genai:gemini-3.5-flash-lite"
     generator_fallback_model: str = "google_genai:gemini-3.1-flash-lite"
     judge_fallback_model: str = "google_genai:gemini-3.5-flash-lite"
+    judge_cross_check_model: str = "google_genai:gemini-3.8-flash"  # 20 calls/day: a sample only
     structured_output_method: Literal["json_schema", "function_calling"] = "json_schema"
     llm_requests_per_minute: int = 15  # per model: every role using a model shares its limit
     llm_timeout_s: float = 20.0  # Gemini uses it as the server deadline: a stalled call fails fast and is retried
-    # Gemini 3 "thinking": default thinking made the planner take ~11 s; low keeps routing quality
-    llm_thinking_level: Literal["minimal", "low", "medium", "high"] = "low"
+    # Gemini 3 "thinking", per role. Default thinking made the planner take ~11 s; low keeps
+    # routing quality. The generator needs medium to combine linked passages (e-KYC 8.10 -> 8.4).
+    planner_thinking_level: Literal["minimal", "low", "medium", "high"] = "low"
+    reviewer_thinking_level: Literal["minimal", "low", "medium", "high"] = "low"
+    generator_thinking_level: Literal["minimal", "low", "medium", "high"] = "medium"
+    judge_thinking_level: Literal["minimal", "low", "medium", "high"] = "low"
     rerank_timeout_s: float = 30.0
     max_question_chars: int = 2000  # the API rejects longer questions (422); scripts cut them
 

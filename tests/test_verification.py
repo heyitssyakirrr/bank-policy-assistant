@@ -156,3 +156,32 @@ def test_finalize_with_nothing_valid_left_refuses():
 def test_feedback_names_the_failing_statement():
     report = check_answer(answer(stmt(text="Banks must X", quote="nowhere at all here")), EVIDENCE)
     assert "Banks must X" in regeneration_feedback(report)
+
+
+LINKED = [
+    ev("E1", "G 8.10 As required under paragraph 8.4, a financial institution may use biometric technology.", "G"),
+    ev("E2", "S 8.4 A financial institution shall ensure measures are secure and effective."),
+]
+for item, paragraph in zip(LINKED, ("8.10", "8.4"), strict=True):
+    item.paragraph_id = paragraph
+
+
+def test_answer_skipping_a_passage_its_citation_relies_on_is_incomplete():
+    only_810 = stmt(obligation="should_or_may", ids=["E1"], quote="may use biometric technology")
+    report = check_answer(answer(only_810), LINKED)
+    assert report.passed and not report.complete
+    assert "E1 depends on E2" in report.incomplete[0].detail
+    assert "E1 depends on E2" in regeneration_feedback(report)
+
+
+def test_answer_using_both_linked_passages_is_complete():
+    both = [
+        stmt(obligation="should_or_may", ids=["E1"], quote="may use biometric technology"),
+        stmt(obligation="must", ids=["E2"], quote="shall ensure measures are secure"),
+    ]
+    assert check_answer(answer(*both), LINKED).complete
+
+
+def test_finalize_never_removes_anything_for_an_incomplete_answer():
+    only_810 = stmt(obligation="should_or_may", ids=["E1"], quote="may use biometric technology")
+    assert finalize(check_answer(answer(only_810), LINKED)).status == "answered"

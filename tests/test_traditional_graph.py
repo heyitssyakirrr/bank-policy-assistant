@@ -111,3 +111,22 @@ def test_second_turn_starts_fresh_but_keeps_the_conversation():
 
 def test_long_input_is_cut():
     assert len(turn_input("x" * 10_000, None)["question"]) == 2000
+
+
+def test_incomplete_answer_is_regenerated_once_then_kept():
+    linked = {
+        "c810": payload("8.10", "G 8.10 FAR as required under paragraph 8.4 may use biometrics", provision="G"),
+        "c84": payload("8.4", "S 8.4 FAR controls shall be secure and effective"),
+    }
+    only_810 = Statement(
+        text="May use biometrics.",
+        obligation="should_or_may",
+        evidence_ids=["E1"],
+        quote="may use biometrics",
+        topic="t",
+    )
+    llm = ScriptedLLM(generator=[answered(only_810), answered(only_810)])
+    context = AgentContext(llm=llm, search=FakeSearch(linked))
+    state = build_traditional_graph().invoke(turn_input("biometrics controls", "banking"), context=context)
+    assert state["generations"] == 2 and state["answer"].status == "answered"
+    assert "depends on" in llm.calls[1][1][-1].content

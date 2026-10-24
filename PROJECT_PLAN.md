@@ -340,6 +340,7 @@ class GroundedAnswer(BaseModel):
 | 4 | A `must` statement does not cite only G paragraphs (unmarked appendix/table passages may state obligations) | Serious |
 | 5 | Status agrees with content (`answered` needs statements; `not_covered` has none) | Fixable: correct the status |
 | 6 | Something valid is left | No: becomes `not_covered` (refusal) |
+| 7 | No cross-reference left out: a cited passage that depends on another given passage ("as required under paragraph 8.4") is answered with it (added 24 Oct) | Incomplete: one regeneration; if still incomplete, kept as is (nothing in it is wrong) |
 
 - Fixable problems are corrected silently and recorded in the audit log.
 - Serious problems mean one regeneration, with feedback listing the problems.
@@ -466,9 +467,31 @@ Recorded here so the plan stays the source of truth:
   - PII: NRIC with dashes, spaces or nothing; cards by Luhn; any other 10-20
     digits (contiguous or in groups of 3+) as an account. Two-digit groups
     (phone area codes, paragraph lists) and amounts are left alone.
-- **Gemini settings:** `thinking_level=low` (default thinking made the
-  planner take ~11 s; low takes ~3 s) and a 20 s timeout, which Gemini uses
-  as the server deadline, so a stalled call (504) fails fast and is retried.
+- **Gemini settings:** thinking level per role: planner, reviewer and judge
+  `low` (default thinking made the planner take ~11 s; low takes ~3 s), the
+  generator `medium` (at low it ignored a fetched cross-reference: e-KYC
+  8.10 answered without 8.4). A 20 s timeout, which Gemini uses as the
+  server deadline, so a stalled call (504) fails fast and is retried.
+- **Cross-references are marked by code (M4):** when a passage depends on
+  another given passage of the same document ("as required under / in
+  relation to / subject to paragraph X", lists and ranges included,
+  references into another document excluded), its evidence block says
+  "Cross-reference: E2 (para 8.4)". The generator is told to include E2's
+  rule, and verifier check 7 enforces it with one regeneration. A
+  regeneration that fails a serious check never replaces a first answer
+  that passed. Real run: agentic "What does e-KYC paragraph 8.10 require?"
+  now answers MUST (8.4, S) + MAY (8.10, G); traditional gives only 8.10.
+  Cost: one extra generator call when it triggers (to be measured in M5).
+- **Streamlit UI (M4):** `ui/app.py` uses `st.navigation` with pages in
+  `ui/views/` (chat, compare, evaluation); the sector and mode choices
+  survive page switches; citation chips show short labels ("e-KYC 8.4
+  (S)", "e-KYC App. 2 para 13") linking to the PDF page; each new rating
+  is posted (feedback is append-only, the latest wins); a failed turn keeps
+  its conversation. The UI reads settings from `app/core/config.py` and
+  talks to the API over HTTP only. `scripts/screenshot_ui.py` (Playwright,
+  dev only) checks the flow in a real browser.
+- **Response cache keys** are `<namespace>:<hash>` (llm, embed_query,
+  rerank), so a run can report its real API calls per kind (cache misses).
 
 ## 6. Memory and chat history (Postgres)
 

@@ -324,3 +324,50 @@ def test_search_ceiling_holds_with_lookup_fallbacks():
     )
     state, _ = run(llm)
     assert len(state["search_log"]) <= Budget().max_searches
+
+
+LINKED_CORPUS = {"e810": CORPUS["e810"], "e84": CORPUS["e84"]}
+ONLY_810 = Statement(
+    text="May use biometric matching.",
+    obligation="should_or_may",
+    evidence_ids=["E1"],
+    quote="verifying identity through biometric matching",
+    topic="8.10",
+)
+
+
+def linked_run(generator_script, budget=None):
+    llm = ScriptedLLM(
+        planner=[plan(searches=["matching"])],
+        reviewer=[review(sufficient=False, relevant=["E1"], cross=[("ekyc", "8.4")]), review(relevant=["E1", "E2"])],
+        generator=generator_script,
+    )
+    context = AgentContext(llm=llm, search=FakeSearch(LINKED_CORPUS), budget=budget or Budget())
+    return build_agentic_graph().invoke(turn_input("What does 8.10 require?", "banking"), context=context), llm
+
+
+def test_an_incomplete_answer_is_regenerated_as_the_fifth_llm_call():
+    complete = GroundedAnswer(
+        status="answered",
+        summary="s",
+        statements=[ONLY_810, answer(evidence_id="E2").statements[0]],
+    )
+    state, llm = linked_run([GroundedAnswer(status="answered", summary="s", statements=[ONLY_810]), complete])
+    assert llm.roles() == ["planner", "reviewer", "reviewer", "generator", "generator"] and state["llm_calls"] == 5
+    assert state["verifications"][-1].complete and "E2" in state["answer"].statements[1].evidence_ids
+
+
+def test_a_worse_regeneration_never_replaces_a_correct_first_answer():
+    first = GroundedAnswer(status="answered", summary="first", statements=[ONLY_810])
+    worse = GroundedAnswer(
+        status="answered", summary="worse", statements=[answer(quote="words not in 8.4").statements[0]]
+    )
+    state, _ = linked_run([first, worse])
+    assert state["answer"].summary == "first" and state["answer"].status == "answered"
+    assert "Kept the first answer" in state["notes"][-1]
+
+
+def test_an_incomplete_answer_is_kept_when_the_budget_is_spent():
+    first = GroundedAnswer(status="answered", summary="first", statements=[ONLY_810])
+    state, llm = linked_run([first], budget=Budget(max_llm_calls=4))
+    assert llm.roles().count("generator") == 1 and state["answer"].summary == "first"

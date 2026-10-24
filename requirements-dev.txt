@@ -2,3 +2,4 @@
 -r requirements-ingest.txt
 pytest
 ruff
+playwright==1.64.1   # scripts/screenshot_ui.py; then: playwright install chromium

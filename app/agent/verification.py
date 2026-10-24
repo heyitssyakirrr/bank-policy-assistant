@@ -8,10 +8,15 @@
 | 4 | a "must" statement doesn't cite only G paragraphs  | serious                        |
 | 5 | status agrees with content                         | correct the status (fix)       |
 | 6 | something valid is left                            | becomes not_covered (refusal)  |
+| 7 | no cross-reference left out: a cited passage that  | incomplete                     |
+|   | depends on another given passage ("as required     |                                |
+|   | under paragraph 8.4") is answered with it          |                                |
 
 Fixes are applied silently and recorded. Serious problems get one
 regeneration with feedback (the graph decides that); if they persist,
-`finalize` removes the bad statements and downgrades the status.
+`finalize` removes the bad statements and downgrades the status. An
+incomplete answer also gets the one regeneration, but if it stays
+incomplete it is kept as it is: nothing in it is wrong, only missing.
 
 Check 4 flags only G: appendix paragraphs and tables carry no S/G marker
 (e.g. the FAR thresholds, e-KYC Appendix 2 para 13), and they can state
@@ -26,7 +31,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.agent.evidence import Evidence
+from app.agent.evidence import Evidence, cross_references
 from app.agent.schemas import GroundedAnswer, Statement
 
 NOT_COVERED_SUMMARY = (
@@ -38,7 +43,9 @@ _ELLIPSIS_RE = re.compile(r"\.{3,}|…")
 _WORD_RE = re.compile(r"\w+")
 _EVIDENCE_ID_RE = re.compile(r"^\[?\s*[Ee]\s*(\d+)\s*\]?$")
 
-CheckName = Literal["unknown_id", "uncited", "quote_not_found", "must_cites_only_guidance", "status"]
+CheckName = Literal[
+    "unknown_id", "uncited", "quote_not_found", "must_cites_only_guidance", "status", "missing_cross_reference"
+]
 
 
 class Issue(BaseModel):
@@ -53,10 +60,15 @@ class VerificationReport(BaseModel):
     answer: GroundedAnswer  # after the fixable corrections
     fixes: list[Issue] = Field(default_factory=list)
     serious: list[Issue] = Field(default_factory=list)
+    incomplete: list[Issue] = Field(default_factory=list)  # check 7: worth one regeneration, never a removal
 
     @property
     def passed(self) -> bool:
         return not self.serious
+
+    @property
+    def complete(self) -> bool:
+        return self.passed and not self.incomplete
 
 
 def normalise_id(raw: str) -> str | None:
@@ -140,7 +152,22 @@ def check_answer(answer: GroundedAnswer, evidence: Sequence[Evidence]) -> Verifi
                     detail=f"'must' statement cites only guidance (G) paragraphs {', '.join(statement.evidence_ids)}",
                 )
             )
-    return VerificationReport(answer=checked, fixes=fixes, serious=serious)
+    return VerificationReport(
+        answer=checked, fixes=fixes, serious=serious, incomplete=_missing_cross_references(checked, evidence)
+    )
+
+
+def _missing_cross_references(answer: GroundedAnswer, evidence: Sequence[Evidence]) -> list[Issue]:
+    """Check 7: e-KYC 8.10 (G) says "as required under paragraph 8.4"; if
+    8.4 was given to the generator, an answer citing 8.10 must use it too."""
+    cited = {i for s in answer.statements for i in s.evidence_ids}
+    missing: list[Issue] = []
+    for item in (e for e in evidence if e.id in cited):
+        for ref in cross_references(item, evidence):
+            if ref.id not in cited:
+                detail = f"{item.id} depends on {ref.id} (para {ref.paragraph_id}): add what {ref.id} requires"
+                missing.append(Issue(check="missing_cross_reference", statement=None, detail=detail))
+    return missing
 
 
 def finalize(report: VerificationReport) -> GroundedAnswer:
@@ -161,8 +188,10 @@ def finalize(report: VerificationReport) -> GroundedAnswer:
 def regeneration_feedback(report: VerificationReport) -> str:
     statements = report.answer.statements
     lines = [f"- {statements[issue.statement].text!r}: {issue.detail}" for issue in report.serious]
+    lines += [f"- {issue.detail}" for issue in report.incomplete]
+    opening = "failed the citation check" if report.serious else "is incomplete"
     return (
-        "Your previous answer failed the citation check:\n" + "\n".join(lines) + "\nFix these: copy each quote word "
-        "for word from the passage you cite, and mark a statement 'must' only if an S paragraph or an unmarked "
-        "passage states it as a requirement."
+        f"Your previous answer {opening}:\n" + "\n".join(lines) + "\nFix these: copy each quote word "
+        "for word from the passage you cite, mark a statement 'must' only if an S paragraph or an unmarked "
+        "passage states it as a requirement, and include every cross-referenced passage."
     )

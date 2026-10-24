@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from app.agent.prompts import applies_to
 from app.agent.schemas import DISCLAIMER
+from app.agent.steps import SHORT_TITLES
 from app.db.models import Turn, TurnEvent
 
 SNIPPET_CHARS = 400
@@ -23,6 +24,7 @@ SNIPPET_CHARS = 400
 
 class SourceView(BaseModel):
     id: str  # "E3"
+    label: str  # "e-KYC 8.4 (S)": short enough for a citation chip
     citation: str  # "e-KYC Policy Document, para 8.4 (S), p. 6"
     document: str
     provision: str | None  # "S" | "G" | None
@@ -73,10 +75,16 @@ def pdf_url(document: str, page: int) -> str:
     return f"{pdf_path(document)}#page={page}"
 
 
-def _source(evidence: dict[str, Any]) -> SourceView:
+def source_view(evidence: dict[str, Any]) -> SourceView:
     text = evidence["text"]
+    scope = evidence.get("scope", "main")
+    paragraph = evidence.get("paragraph_id") or "table"
+    if scope != "main":  # appendices reuse paragraph numbers: "e-KYC App. 2 para 13"
+        paragraph = f"{scope.replace('Appendix', 'App.')} para {paragraph}"
+    marker = f" ({evidence['provision']})" if evidence.get("provision") else ""
     return SourceView(
         id=evidence["id"],
+        label=f"{SHORT_TITLES[evidence['document']]} {paragraph}{marker}",
         citation=evidence["citation"],
         document=evidence["document"],
         provision=evidence.get("provision"),
@@ -112,7 +120,7 @@ def turn_view(turn: Turn, events: Sequence[TurnEvent]) -> TurnView:
             for s in statements
         ],
         gaps=answer.get("gaps"),
-        sources=[_source(evidence[i]) for i in cited if i in evidence],
+        sources=[source_view(evidence[i]) for i in cited if i in evidence],
         applies_to=applies_to(turn.sector),
         verified=bool(verifications) and not verifications[-1].get("serious"),
         notes=turn.notes,

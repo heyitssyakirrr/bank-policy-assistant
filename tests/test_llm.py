@@ -59,8 +59,9 @@ def client(scripts, cache=None):
     chats = {model: FakeChat(script) for model, script in scripts.items()}
     llm = ChatModelClient(
         cache=cache,
-        build=lambda model: chats[model],
+        build=lambda model, thinking: chats[model],
         models_for=lambda role: ("primary", "backup"),
+        thinking_for=lambda role: "low",
         requests_per_minute=1000,
     )
     return llm, chats
@@ -188,3 +189,22 @@ class Coded(Exception):
 )
 def test_only_temporary_errors_are_transient(exc, transient):
     assert is_transient(exc) is transient
+
+
+def test_each_role_gets_its_own_thinking_level_and_cache_key(tmp_path):
+    built = []
+
+    def build(model, thinking):
+        built.append((model, thinking))
+        return FakeChat([ok(thinking)])
+
+    llm = ChatModelClient(
+        cache=ResponseCache(tmp_path / "c.sqlite"),
+        build=build,
+        models_for=lambda role: ("same-model", "same-model"),
+        thinking_for=lambda role: "medium" if role == "generator" else "low",
+        requests_per_minute=1000,
+    )
+    assert llm.invoke("planner", MESSAGES, Answer).output.text == "low"
+    assert llm.invoke("generator", MESSAGES, Answer).output.text == "medium"  # same prompt, not a cache hit
+    assert built == [("same-model", "low"), ("same-model", "medium")]

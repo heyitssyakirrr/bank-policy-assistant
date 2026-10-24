@@ -82,13 +82,15 @@ def role_models(role: Role) -> tuple[str, str]:
     return getattr(settings, f"{role}_model"), getattr(settings, f"{role}_fallback_model")
 
 
-def build_chat_model(model: str) -> BaseChatModel:
+def role_thinking(role: Role) -> str:
+    return getattr(settings, f"{role}_thinking_level")
+
+
+def build_chat_model(model: str, thinking_level: str) -> BaseChatModel:
     """ "google_genai:gemini-3.1-flash-lite" -> a LangChain chat model. Retries
     are ours (retry_live), so the SDK makes a single attempt per request."""
     provider_options = (
-        {"thinking_config": {"thinking_level": settings.llm_thinking_level}}
-        if model.startswith("google_genai:")
-        else {}
+        {"thinking_config": {"thinking_level": thinking_level}} if model.startswith("google_genai:") else {}
     )
     return init_chat_model(
         model,
@@ -117,27 +119,30 @@ class ChatModelClient:
     def __init__(
         self,
         cache: ResponseCache | None = None,
-        build: Callable[[str], BaseChatModel] = build_chat_model,
+        build: Callable[[str, str], BaseChatModel] = build_chat_model,
         models_for: Callable[[Role], tuple[str, str]] = role_models,
+        thinking_for: Callable[[Role], str] = role_thinking,
         method: str = settings.structured_output_method,
         requests_per_minute: int = settings.llm_requests_per_minute,
     ) -> None:
         self._cache = cache
         self._build = build
         self._models_for = models_for
+        self._thinking_for = thinking_for
         self._method = method
         self._rpm = requests_per_minute
-        self._chat_models: dict[str, BaseChatModel] = {}
+        self._chat_models: dict[tuple[str, str], BaseChatModel] = {}
         self._lock = threading.Lock()
         self.requests: Counter[str] = Counter()  # API requests sent per model (the quota ledger)
 
     def invoke[T: BaseModel](self, role: Role, messages: Sequence[BaseMessage], schema: type[T]) -> LLMResult[T]:
         primary, fallback = self._models_for(role)
+        thinking = self._thinking_for(role)
         errors: list[str] = []
         failed_calls = 0
         for model in dict.fromkeys((primary, fallback)):  # same model twice = no fallback
             try:
-                return self._invoke_model(model, messages, schema)
+                return self._invoke_model(model, thinking, messages, schema)
             except Exception as exc:
                 if not (isinstance(exc, _MODEL_SPECIFIC_ERRORS) or is_transient(exc)):
                     raise  # a bad request or bad key won't be fixed by another model
@@ -146,13 +151,17 @@ class ChatModelClient:
                 failed_calls += getattr(exc, "calls", 1)
         raise LLMUnavailableError(f"{role}: every model failed ({'; '.join(errors)})", failed_calls)
 
-    def _invoke_model[T: BaseModel](self, model: str, messages: Sequence[BaseMessage], schema: type[T]) -> LLMResult[T]:
+    def _invoke_model[T: BaseModel](
+        self, model: str, thinking: str, messages: Sequence[BaseMessage], schema: type[T]
+    ) -> LLMResult[T]:
         request = {"schema": schema.model_json_schema(), "messages": _serialise(messages)}
-        key = cache_key("llm", f"{model}|thinking={settings.llm_thinking_level}", request)
+        key = cache_key("llm", f"{model}|thinking={thinking}", request)
         if self._cache is not None and (hit := self._cache.get(key)) is not None:
             return LLMResult(schema.model_validate(hit["output"]), model, hit["calls"], *hit["tokens"], 0.0, True)
 
-        runnable = self._chat_model(model).with_structured_output(schema, method=self._method, include_raw=True)
+        runnable = self._chat_model(model, thinking).with_structured_output(
+            schema, method=self._method, include_raw=True
+        )
         conversation = list(messages)
         input_tokens = output_tokens = calls = 0
         started = time.perf_counter()
@@ -190,8 +199,8 @@ class ChatModelClient:
             self.requests[model] += 1
         return runnable.invoke(conversation)
 
-    def _chat_model(self, model: str) -> BaseChatModel:
+    def _chat_model(self, model: str, thinking: str) -> BaseChatModel:
         with self._lock:
-            if model not in self._chat_models:
-                self._chat_models[model] = self._build(model)
-            return self._chat_models[model]
+            if (model, thinking) not in self._chat_models:
+                self._chat_models[model, thinking] = self._build(model, thinking)
+            return self._chat_models[model, thinking]

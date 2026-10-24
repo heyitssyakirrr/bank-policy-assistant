@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from qdrant_client import QdrantClient
@@ -116,9 +116,18 @@ class SearchService:
         ]
 
 
-def build_search_service(cache: ResponseCache | None = None) -> SearchService:
-    """The real search stack: Qdrant + Gemini query embeddings + Cohere.
-    With a cache (development and evaluation), repeated queries cost nothing."""
+@dataclass(frozen=True, slots=True)
+class SearchParts:
+    """The pieces of the search, also used one by one by the retrieval ablation."""
+
+    repo: VectorRepository
+    embed: Callable[[str], list[float]]
+    reranker: Reranker
+
+
+def build_search_parts(cache: ResponseCache | None = None) -> SearchParts:
+    """Qdrant + Gemini query embeddings + Cohere. With a cache (development
+    and evaluation), repeated queries cost nothing."""
     repo = VectorRepository(QdrantClient(url=settings.qdrant_url), settings.qdrant_collection)
     reranker: Reranker
     if settings.cohere_api_key:
@@ -129,4 +138,10 @@ def build_search_service(cache: ResponseCache | None = None) -> SearchService:
         logger.warning("COHERE_API_KEY is not set: searches use the fused order, not reranked")
         reranker = NoReranker()
     embed = cached_embed_query(cache) if cache is not None else embed_query
-    return SearchService(RetrievalService(repo, embed), reranker)
+    return SearchParts(repo, embed, reranker)
+
+
+def build_search_service(cache: ResponseCache | None = None) -> SearchService:
+    """The real search stack (see build_search_parts)."""
+    parts = build_search_parts(cache)
+    return SearchService(RetrievalService(parts.repo, parts.embed), parts.reranker)

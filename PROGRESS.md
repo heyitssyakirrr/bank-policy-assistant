@@ -5,9 +5,9 @@
 
 **Last updated:** 2026-10-24
 **Goal:** live Streamlit demo of the agentic RAG, **Mon 26 Oct 2026**
-**Current step:** M4, Streamlit UI (autonomous build by Claude Code; see
-PROJECT_PLAN.md §10)
-**Tests:** 239 passing
+**Current step:** M5, golden set + evaluation harness (autonomous build by
+Claude Code; see PROJECT_PLAN.md §10)
+**Tests:** 271 passing
 **Repo:** _(add your GitHub link)_
 
 ---
@@ -22,8 +22,8 @@ DONE ████████████████████  Rerank + sele
 DONE ████████████████████  M1  LLM layer + traditional RAG
 DONE ████████████████████  M2  LangGraph agent
 DONE ████████████████████  M3  Postgres memory + audit + FastAPI
-NEXT ░░░░░░░░░░░░░░░░░░░░  M4  Streamlit UI
-     ░░░░░░░░░░░░░░░░░░░░  M5  Golden set + evaluation harness
+DONE ████████████████████  M4  Streamlit UI
+NEXT ░░░░░░░░░░░░░░░░░░░░  M5  Golden set + evaluation harness
      ░░░░░░░░░░░░░░░░░░░░  M6  Docker, CI, LangSmith
      ░░░░░░░░░░░░░░░░░░░░  M7–M9  Evaluation runs, fixes, docs, freeze
 ```
@@ -79,7 +79,11 @@ packaging.
   deps, routes: chat SSE, conversations, feedback, documents, health),
   `app/main.py` app factory with a PostgresSaver. Old echo app removed.
   Reviewed by code-reviewer: 2 major + 7 minor findings, all fixed.
-- [ ] M4 Streamlit: Chat, Compare, Evaluation
+- [x] M4 Streamlit: Chat, Compare, Evaluation (24 Oct). `ui/` (app.py
+  navigation, views/chat, compare, evaluation; components; api_client),
+  `scripts/screenshot_ui.py`, `docs/screenshots/`. While testing the UI:
+  per-role thinking, code-marked cross-references, verifier check 7.
+  Reviewed by code-reviewer: 4 major + 8 minor findings, all fixed.
 - [ ] M5 Golden set + evaluation harness (smoke + full)
 - [ ] **Syakir:** spot-check ≥ 10 golden-set items against the PDFs
 - [ ] M6 Docker (index from committed cache), `.env.example`, LangSmith, CI
@@ -96,7 +100,8 @@ packaging.
 | 24 Oct ~02:10 | M1 smoke: FAR question + credit-card refusal (traditional), + 2 query embeddings | 0 | 2 | 2 |
 | 24 Oct ~02:20–02:38 | M2 smoke: the five §2 cases in agentic mode (8.10 ×3, comparison ×2, follow-up pair, para 8.2, credit card), incl. 3 retried 504s, + 9 query embeddings | 21 | 7 | 9 |
 | 24 Oct ~02:46 | M3 smoke: 2 API requests (agentic follow-up across requests, NRIC in turn 1), incl. 1 retried 504, + 3 query embeddings | 5 | 2 | 3 |
-| **24 Oct total** | | **26** | **11** | **14** |
+| 24 Oct ~03:00–03:40 | M4: UI chat question, 3 Compare runs (8.10), generator prompt/thinking trials via ask.py (cached planner/reviewer) | 15 | 11 | 5 |
+| **24 Oct total** | | **41** | **22** | **19** |
 
 ---
 
@@ -117,6 +122,8 @@ packaging.
 | M2 agentic: "What does para 8.2 say?" | CLARIFY: asks which of the 3 documents; 1 LLM call, no search |
 | M2 agentic: "What's the interest rate cap on credit cards?" | OUT_OF_SCOPE refusal before any search; 1 LLM call |
 | M3 API: "Can a bank onboard customer 900101-14-5678 without meeting face to face?" then "what about money changers?" (same conversation_id) | NRIC masked in prompts, logs and `turns`; turn 2 rewritten from the Postgres checkpoint, sector → money services, cites the AML 14C copies (14C.16.1, 14C.16.10-12); 31 s (one 504 retry) and 9 s; 2 `turns` + 13 `turn_events` rows; UPDATE and TRUNCATE on the audit tables rejected |
+| M4 UI Compare: "What does e-KYC paragraph 8.10 require?" | traditional 7.2 s, 1 LLM call: only 8.10 (MAY). Agentic 40.6 s, 5 LLM calls: followed 8.10 → 8.4, regenerated once (check 7), answered MUST from 8.4 (S) + MAY from 8.10 (G). Screenshot: docs/screenshots/compare.png |
+| Generator thinking trial (8.10) | low: ignored the fetched 8.4 even with an explicit prompt rule; medium: used it (4.3 s generator) |
 | Gemini latency | planner 11 s with default thinking → 3 s with `thinking_level=low`. gemini-3.1-flash-lite returned 504 DEADLINE_EXCEEDED on ~1 in 8 calls (retried); a stalled call cost up to 30 s, now 20 s |
 
 **Latency:** embed ~0.7–0.9 s · Qdrant search ~30–45 ms · rerank ~0.8–1.3 s
@@ -175,6 +182,14 @@ bank-policy-assistant/
 ---
 
 ## Decisions log (why things are the way they are)
+
+**Autonomous build, M4 (2026-10-24)**
+- See PROJECT_PLAN §5.7 (Gemini settings, cross-references, Streamlit UI,
+  cache keys) and §5.4 check 7.
+- The reviewer found that a regeneration could replace a correct first
+  answer, and that the first cross-reference parser linked "paragraph 6.2
+  of the AML/CFT policy document" to e-KYC 6.2 and missed lists; both fixed
+  and tested on the real corpus (53 chunks carry a dependency).
 
 **Autonomous build, M3 (2026-10-24)**
 - See PROJECT_PLAN §5.7 "Persistence + API details". The reviewer found

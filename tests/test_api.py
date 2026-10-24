@@ -21,6 +21,7 @@ from app.agent.traditional import build_traditional_graph
 from app.api.deps import Services
 from app.api.routes.health import readiness
 from app.api.runner import TurnRunner, index_version
+from app.api.views import source_view
 from app.core.logging import RequestIdFilter
 from app.db.audit_repository import AuditRepository
 from app.db.models import Base
@@ -253,3 +254,16 @@ def test_index_version_hashes_the_chunks_or_their_gzip(tmp_path):
         handle.write(b'{"chunk": 1}\n')
     assert index_version(plain) == index_version(zipped) != "unknown"
     assert index_version(tmp_path / "missing.jsonl") == "unknown"
+
+
+@pytest.mark.parametrize(
+    ("evidence", "label"),
+    [
+        ({"document": "ekyc", "scope": "main", "paragraph_id": "8.4", "provision": "S"}, "e-KYC 8.4 (S)"),
+        ({"document": "ekyc", "scope": "Appendix 2", "paragraph_id": "13", "provision": None}, "e-KYC App. 2 para 13"),
+        ({"document": "amlcft", "scope": "main", "paragraph_id": None, "provision": None}, "AML/CFT table"),
+    ],
+)
+def test_source_labels_are_short_and_unambiguous(evidence, label):
+    full = evidence | {"id": "E1", "citation": "c", "text": "t", "page": 3}
+    assert source_view(full).label == label

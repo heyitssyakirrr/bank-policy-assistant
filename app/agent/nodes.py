@@ -93,7 +93,7 @@ def generate_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
 def verify_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     report = check_answer(state["answer"], answer_evidence(state))
     update: dict[str, Any] = {"verifications": [report]}
-    if report.passed:
+    if report.complete:
         return update | {"answer": report.answer}
     budget = runtime.context.budget
     can_regenerate = (
@@ -103,6 +103,11 @@ def verify_answer(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str
     )
     if can_regenerate:
         return update | {"feedback": regeneration_feedback(report)}
+    if report.passed:  # only incomplete: keep it, nothing in it is wrong
+        return update | {"answer": report.answer}
+    earlier = state.get("verifications", [])
+    if earlier and earlier[-1].passed:  # the regeneration made it worse: keep the first, correct answer
+        return update | {"answer": earlier[-1].answer, "notes": ["Kept the first answer: the revision failed checks."]}
     notes = [] if state.get("generations", 0) >= MAX_GENERATIONS else ["Regeneration skipped: request budget reached."]
     return update | {"answer": finalize(report), "notes": notes}
 
