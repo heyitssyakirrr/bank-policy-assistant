@@ -165,11 +165,14 @@ def main() -> None:
         return
 
     cache = ResponseCache(settings.response_cache_path)
-    llm = ChatModelClient(cache=cache)
+    # Faithful attribution over speed: no cooldown, and only the asked model's cached answer.
+    llm = ChatModelClient(cache=cache, cooldown_s=0, reuse_fallback_answers=False)
     cross = None
     if cross_check:
         cross_model = settings.judge_cross_check_model
-        cross = ChatModelClient(cache=cache, models_for=lambda role: (cross_model, cross_model))
+        cross = ChatModelClient(
+            cache=cache, models_for=lambda role: (cross_model, cross_model), cooldown_s=0, reuse_fallback_answers=False
+        )
     parts = build_search_parts(cache)
     context = AgentContext(llm=llm, search=SearchService(RetrievalService(parts.repo, parts.embed), parts.reranker))
 

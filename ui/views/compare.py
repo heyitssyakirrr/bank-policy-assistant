@@ -71,13 +71,13 @@ if results.get("question"):
                 st.error(results.get(f"{mode}_error") or "No answer.", icon=":material/error:")
     if results.get("traditional") and results.get("agentic"):
         st.subheader("What each mode did")
-        rows = {
+        rows = {  # every cell is text: a column mixing numbers and words can't be shown as one type
             SIDES[mode][0]: {
                 "Result": result_badge(turn)[0],
-                "Statements": len(turn["statements"]),
-                "Sources cited": len(turn["sources"]),
-                "Agent steps": len(turn["steps"]),
-                "LLM calls": turn["llm_calls"],
+                "Statements": str(len(turn["statements"])),
+                "Sources cited": str(len(turn["sources"])),
+                "Agent steps": str(len(turn["steps"])),
+                "LLM calls": str(turn["llm_calls"]),
                 "Tokens": f"{turn['input_tokens'] + turn['output_tokens']:,}",
                 "Time": f"{turn['latency_ms'] / 1000:.1f} s",
             }

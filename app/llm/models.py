@@ -1,9 +1,12 @@
 """The one adapter every LLM call goes through.
 
-    role ("planner") ──► model from settings ──► rate limiter (shared per model)
-         ──► cache? ──► call with live retries ──► validated Pydantic object
+    role ("planner") ──► cached answer from the role's model or its fallback? ──► done
+         ──► model from settings ──► rate limiter (shared per model)
+         ──► call with live retries ──► validated Pydantic object
                      └─ malformed JSON: 1 repair retry
          primary model failing (quota, outage) ──► the role's fallback model
+         a model that just failed with an outage or overload is tried last for
+         a cooldown, so every step doesn't pay its retries again
 
 Nodes depend on the `StructuredLLM` protocol, never on a provider: the real
 `ChatModelClient` in the app, a scripted fake in tests.
@@ -124,41 +127,76 @@ class ChatModelClient:
         thinking_for: Callable[[Role], str] = role_thinking,
         method: str = settings.structured_output_method,
         requests_per_minute: int = settings.llm_requests_per_minute,
+        cooldown_s: float = settings.llm_cooldown_s,
+        clock: Callable[[], float] = time.monotonic,
+        reuse_fallback_answers: bool = True,
     ) -> None:
+        """For live answers, speed comes first: a model in its cooldown is tried last,
+        and a cached answer from either of the role's models is used straight away.
+        Evaluation passes `cooldown_s=0, reuse_fallback_answers=False`, so every
+        answer is attributed to the model that should give it (e.g. the judge
+        isn't silently replaced by the generator's model for later re-runs)."""
         self._cache = cache
         self._build = build
         self._models_for = models_for
         self._thinking_for = thinking_for
         self._method = method
         self._rpm = requests_per_minute
+        self._cooldown_s = cooldown_s
+        self._clock = clock
+        self._reuse_fallback_answers = reuse_fallback_answers
+        self._cooling_until: dict[str, float] = {}  # model -> when it may be tried first again
         self._chat_models: dict[tuple[str, str], BaseChatModel] = {}
         self._lock = threading.Lock()
         self.requests: Counter[str] = Counter()  # API requests sent per model (the quota ledger)
 
     def invoke[T: BaseModel](self, role: Role, messages: Sequence[BaseMessage], schema: type[T]) -> LLMResult[T]:
-        primary, fallback = self._models_for(role)
+        models = list(dict.fromkeys(self._models_for(role)))  # same model twice = no fallback
         thinking = self._thinking_for(role)
+        keys = {model: self._cache_key(model, thinking, messages, schema) for model in models}
+        if self._reuse_fallback_answers:  # an answer either model already gave costs nothing
+            for model in models:
+                if (hit := self._cached(keys[model], schema, model)) is not None:
+                    return hit
         errors: list[str] = []
         failed_calls = 0
-        for model in dict.fromkeys((primary, fallback)):  # same model twice = no fallback
+        for model in sorted(models, key=self._cooling):  # stable: a cooling model just moves last
+            if (hit := self._cached(keys[model], schema, model)) is not None:
+                return hit
             try:
-                return self._invoke_model(model, thinking, messages, schema)
+                result = self._invoke_model(model, thinking, messages, schema, keys[model])
             except Exception as exc:
                 if not (isinstance(exc, _MODEL_SPECIFIC_ERRORS) or is_transient(exc)):
                     raise  # a bad request or bad key won't be fixed by another model
+                if is_transient(exc) and self._cooldown_s:  # overloaded or out of quota: spare the next steps
+                    with self._lock:
+                        self._cooling_until[model] = self._clock() + self._cooldown_s
                 logger.warning(f"{role} on {model} failed ({type(exc).__name__}: {exc}); trying fallback")
                 errors.append(f"{model}: {type(exc).__name__}")
                 failed_calls += getattr(exc, "calls", 1)
+                continue
+            with self._lock:  # it answered: back to its normal place
+                self._cooling_until.pop(model, None)
+            return result
         raise LLMUnavailableError(f"{role}: every model failed ({'; '.join(errors)})", failed_calls)
 
-    def _invoke_model[T: BaseModel](
-        self, model: str, thinking: str, messages: Sequence[BaseMessage], schema: type[T]
-    ) -> LLMResult[T]:
-        request = {"schema": schema.model_json_schema(), "messages": _serialise(messages)}
-        key = cache_key("llm", f"{model}|thinking={thinking}", request)
-        if self._cache is not None and (hit := self._cache.get(key)) is not None:
-            return LLMResult(schema.model_validate(hit["output"]), model, hit["calls"], *hit["tokens"], 0.0, True)
+    def _cooling(self, model: str) -> bool:
+        with self._lock:
+            return self._cooling_until.get(model, 0.0) > self._clock()
 
+    @staticmethod
+    def _cache_key(model: str, thinking: str, messages: Sequence[BaseMessage], schema: type[BaseModel]) -> str:
+        request = {"schema": schema.model_json_schema(), "messages": _serialise(messages)}
+        return cache_key("llm", f"{model}|thinking={thinking}", request)
+
+    def _cached[T: BaseModel](self, key: str, schema: type[T], model: str) -> LLMResult[T] | None:
+        if self._cache is None or (hit := self._cache.get(key)) is None:
+            return None
+        return LLMResult(schema.model_validate(hit["output"]), model, hit["calls"], *hit["tokens"], 0.0, True)
+
+    def _invoke_model[T: BaseModel](
+        self, model: str, thinking: str, messages: Sequence[BaseMessage], schema: type[T], key: str
+    ) -> LLMResult[T]:
         runnable = self._chat_model(model, thinking).with_structured_output(
             schema, method=self._method, include_raw=True
         )

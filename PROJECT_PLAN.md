@@ -561,6 +561,22 @@ Recorded here so the plan stays the source of truth:
   - the sidebar history shows only the visitor's own conversations from
     this browser session (there are no logins), so visitors never see each
     other's questions.
+- **Model cooldown and cache across models (26 Oct, from the live logs):**
+  on Streamlit Cloud `gemini-3.1-flash-lite` answered 503 "high demand" on
+  almost every call, so each planner and reviewer step spent ~5–6 s on three
+  failed tries before the fallback. Now a model that fails with an outage,
+  overload or quota error is tried *last* for `LLM_COOLDOWN_S` (120 s), so
+  only the first step pays; and before any call the cache is checked for an
+  answer from either of the role's models, so a repeated question costs no
+  call even when the earlier answer came from the fallback. A model that
+  answers leaves its cooldown at once. **The evaluation turns both off**
+  (`cooldown_s=0, reuse_fallback_answers=False` in `evals/run.py`): there,
+  faithful attribution beats speed, and a fallback verdict cached during an
+  outage must not stand in for the independent judge on later re-runs.
+  Known: a daily-quota 429 cools the model for 120 s at a time (so it is
+  retried every 2 minutes until the reset), and after a model's live
+  retries give up its failed attempts count as one call in the request
+  budget (`ChatModelClient.requests`, the quota ledger, stays exact).
 - **UI redesign (26 Oct):** no emojis; Material icons, a restrained theme in
   `.streamlit/config.toml` (light and dark), example questions for a first
   visit, agent steps as a step timeline with per-step times (`TurnView.steps`

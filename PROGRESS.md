@@ -9,7 +9,7 @@
 **Current step:** deployment (Syakir: accounts, index upload, push,
 docs/DEPLOY.md) and M7, the first full evaluation (Syakir runs it after the
 3 pm quota reset)
-**Tests:** 309 passing
+**Tests:** 321 passing
 **Repo:** _(add your GitHub link)_
 
 ---
@@ -237,6 +237,16 @@ bank-policy-assistant/
 ---
 
 ## Decisions log (why things are the way they are)
+
+**Model cooldown (2026-10-26)**
+- From Syakir's live logs: gemini-3.1-flash-lite answered 503 "high demand"
+  on nearly every call, so each planner/reviewer step lost ~5–6 s retrying
+  before the fallback (an agentic answer took 35–50 s). A failed model is
+  now tried last for 120 s, and live answers reuse a cached answer from
+  either model; the evaluation keeps the old, faithful behaviour (see
+  PROJECT_PLAN §5.7). Reviewed by code-reviewer: 1 major (eval attribution)
+  + 4 minor findings, fixed; the call-count gap after failed retries is
+  older than this change and recorded as known.
 
 **Deployment and UI redesign (2026-10-26)**
 - The submission needs a public link. Syakir chose option A: Streamlit

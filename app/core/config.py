@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     judge_cross_check_model: str = "google_genai:gemini-3.8-flash"  # 20 calls/day: a sample only
     structured_output_method: Literal["json_schema", "function_calling"] = "json_schema"
     llm_requests_per_minute: int = 15  # per model: every role using a model shares its limit
+    llm_cooldown_s: float = 120.0  # a model that failed with an overload/outage is tried last for this long
     llm_timeout_s: float = 20.0  # Gemini uses it as the server deadline: a stalled call fails fast and is retried
     # Gemini 3 "thinking", per role. Default thinking made the planner take ~11 s; low keeps
     # routing quality. The generator needs medium to combine linked passages (e-KYC 8.10 -> 8.4).

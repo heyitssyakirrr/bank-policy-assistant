@@ -21,6 +21,11 @@ class RateLimited(Exception):
     is_retryable = True
 
 
+class Coded(Exception):
+    def __init__(self, code):
+        self.code = code
+
+
 def ok(text="hi"):
     return {"raw": AIMessage(content="{}", usage_metadata=usage()), "parsed": Answer(text=text), "parsing_error": None}
 
@@ -55,7 +60,7 @@ def no_backoff_sleep(monkeypatch):
     monkeypatch.setattr("time.sleep", lambda seconds: None)
 
 
-def client(scripts, cache=None):
+def client(scripts, cache=None, clock=lambda: 0.0, reuse_fallback_answers=True):
     chats = {model: FakeChat(script) for model, script in scripts.items()}
     llm = ChatModelClient(
         cache=cache,
@@ -63,6 +68,9 @@ def client(scripts, cache=None):
         models_for=lambda role: ("primary", "backup"),
         thinking_for=lambda role: "low",
         requests_per_minute=1000,
+        cooldown_s=120,
+        clock=clock,
+        reuse_fallback_answers=reuse_fallback_answers,
     )
     return llm, chats
 
@@ -125,6 +133,101 @@ def test_cached_response_costs_no_request(tmp_path):
     assert llm.requests == {"primary": 1}
 
 
+def test_an_overloaded_model_is_tried_last_until_its_cooldown_ends():
+    now = [0.0]
+    llm, _ = client(
+        {"primary": [RateLimited()] * 3 + [ok("primary again")], "backup": [ok("b1"), ok("b2")]},
+        clock=lambda: now[0],
+    )
+    assert llm.invoke("planner", MESSAGES, Answer).model == "backup"  # primary failed 3 times
+    assert llm.invoke("reviewer", MESSAGES, Answer).model == "backup"  # no new wait on the primary
+    assert llm.requests == {"primary": 3, "backup": 2}
+    now[0] = 121.0  # the cooldown is over: the primary comes first again
+    assert llm.invoke("planner", MESSAGES, Answer).output.text == "primary again"
+
+
+@pytest.mark.parametrize("outage", [Coded(503), Coded(504), TimeoutError()])
+def test_overloads_and_timeouts_start_the_cooldown(outage):
+    llm, _ = client({"primary": [outage] * 3, "backup": [ok(), ok()]})
+    llm.invoke("planner", MESSAGES, Answer)
+    llm.invoke("reviewer", MESSAGES, Answer)
+    assert llm.requests == {"primary": 3, "backup": 2}
+
+
+def test_the_cooldown_lasts_exactly_its_length():
+    now = [0.0]
+    llm, _ = client({"primary": [Coded(503)] * 3 + [ok("p")], "backup": [ok("b1"), ok("b2")]}, clock=lambda: now[0])
+    llm.invoke("planner", MESSAGES, Answer)
+    now[0] = 119.9  # still cooling just before the end
+    assert llm.invoke("planner", MESSAGES, Answer).output.text == "b2"
+    now[0] = 120.0  # over at exactly its length
+    assert llm.invoke("planner", MESSAGES, Answer).output.text == "p"
+
+
+def test_with_both_models_cooling_the_order_stays_and_a_success_ends_the_cooldown():
+    llm, _ = client(
+        {
+            "primary": [Coded(503)] * 3 + [ok("primary is back"), ok("primary first again")],
+            "backup": [Coded(503)] * 3 + [invalid(), invalid()],
+        }
+    )
+    with pytest.raises(LLMUnavailableError):
+        llm.invoke("planner", MESSAGES, Answer)  # both fail: both cooling
+    # Both cooling: primary first; it answers and leaves its cooldown.
+    assert llm.invoke("planner", MESSAGES, Answer).output.text == "primary is back"
+    assert llm.invoke("planner", MESSAGES, Answer).output.text == "primary first again"
+
+
+def test_a_cooling_primary_still_answers_when_the_fallback_breaks():
+    llm, _ = client({"primary": [Coded(503)] * 3 + [ok("primary")], "backup": [ok("b"), invalid(), invalid()]})
+    llm.invoke("planner", MESSAGES, Answer)  # primary cooling
+    assert llm.invoke("planner", MESSAGES, Answer).output.text == "primary"  # backup malformed twice
+
+
+def test_a_single_model_role_is_still_called_while_cooling():
+    chat = FakeChat([Coded(503)] * 3 + [ok("cross-check")])
+    llm = ChatModelClient(
+        build=lambda model, thinking: chat, models_for=lambda role: ("only", "only"), thinking_for=lambda role: "low"
+    )
+    with pytest.raises(LLMUnavailableError):
+        llm.invoke("judge", MESSAGES, Answer)
+    assert llm.invoke("judge", MESSAGES, Answer).output.text == "cross-check"
+
+
+def test_the_primarys_cached_answer_wins_when_both_are_cached(tmp_path):
+    cache = ResponseCache(tmp_path / "cache.sqlite")
+    down, _ = client({"primary": [Coded(503)] * 3, "backup": [ok("backup")]}, cache)
+    down.invoke("planner", MESSAGES, Answer)
+    up, _ = client({"primary": [ok("primary")], "backup": []}, cache, reuse_fallback_answers=False)
+    up.invoke("planner", MESSAGES, Answer)  # caches the primary's answer
+    fresh, _ = client({"primary": [], "backup": []}, cache)
+    assert fresh.invoke("planner", MESSAGES, Answer).model == "primary"
+
+
+def test_evaluation_settings_ask_the_primary_again_instead_of_reusing_the_fallback(tmp_path):
+    cache = ResponseCache(tmp_path / "cache.sqlite")
+    down, _ = client({"primary": [Coded(503)] * 3, "backup": [ok("self-judged")]}, cache)
+    down.invoke("judge", MESSAGES, Answer)  # an outage: the fallback answered and was cached
+    faithful, _ = client({"primary": [ok("independent")], "backup": []}, cache, reuse_fallback_answers=False)
+    result = faithful.invoke("judge", MESSAGES, Answer)
+    assert result.model == "primary" and result.output.text == "independent"
+
+
+def test_a_malformed_answer_does_not_put_a_model_in_cooldown():
+    llm, _ = client({"primary": [invalid(), invalid(), ok("primary")], "backup": [ok("backup")]})
+    assert llm.invoke("planner", MESSAGES, Answer).model == "backup"
+    assert llm.invoke("planner", [HumanMessage(content="another")], Answer).model == "primary"
+
+
+def test_a_cached_answer_from_the_fallback_is_used_without_calling_the_primary(tmp_path):
+    cache = ResponseCache(tmp_path / "cache.sqlite")
+    llm, _ = client({"primary": [RateLimited()] * 3, "backup": [ok("from backup")]}, cache)
+    llm.invoke("planner", MESSAGES, Answer)  # the primary was down: the backup's answer is cached
+    again, _ = client({"primary": [], "backup": []}, cache)  # a new process: no cooldown remembered
+    result = again.invoke("planner", MESSAGES, Answer)
+    assert result.cached and result.model == "backup" and again.requests == {}
+
+
 def test_a_different_prompt_is_a_cache_miss(tmp_path):
     cache = ResponseCache(tmp_path / "cache.sqlite")
     llm, _ = client({"primary": [ok("a"), ok("b")], "backup": []}, cache)
@@ -176,11 +279,6 @@ def test_limiter_counts_every_call_from_parallel_threads():
 
 
 # ---------------------------------------------------------------- retry policy
-
-
-class Coded(Exception):
-    def __init__(self, code):
-        self.code = code
 
 
 @pytest.mark.parametrize(
