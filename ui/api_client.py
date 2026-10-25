@@ -1,14 +1,13 @@
-"""The UI's only way to the backend: HTTP calls to the FastAPI app.
+"""The UI's backend over HTTP: the FastAPI app (UI_BACKEND=api).
 
-The UI never imports the agent. It sends a question and reads the
-Server-Sent Events stream: "start", one "step" per graph node, then
-"answer" (or "error"). That is the whole contract between them.
+It sends a question and reads the Server-Sent Events stream: "start", one
+"step" per graph node, then "answer" (or "error"). See ui/backend.py.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from typing import Any
 
 import httpx
@@ -31,6 +30,15 @@ def parse_sse(lines: Iterable[str]) -> Iterator[dict[str, Any]]:
         yield json.loads("\n".join(data))
 
 
+def _refusal(response: httpx.Response) -> str:
+    """The API's own reason when it has one (e.g. the daily limit, 429)."""
+    try:
+        detail = response.json().get("detail")
+    except ValueError:
+        detail = None
+    return detail if isinstance(detail, str) else f"The API refused the question ({response.status_code})."
+
+
 class ApiClient:
     def __init__(self, base_url: str, public_url: str, transport: httpx.BaseTransport | None = None) -> None:
         self._http = httpx.Client(base_url=base_url, timeout=STREAM_TIMEOUT, transport=transport)
@@ -44,14 +52,16 @@ class ApiClient:
             with self._http.stream("POST", "/chat", json=body) as response:
                 if response.status_code != 200:
                     response.read()
-                    yield {"type": "error", "message": f"The API refused the question ({response.status_code})."}
+                    yield {"type": "error", "message": _refusal(response)}
                     return
                 yield from parse_sse(response.iter_lines())
         except httpx.HTTPError as exc:
             yield {"type": "error", "message": f"Cannot reach the API ({type(exc).__name__})."}
 
-    def conversations(self) -> list[dict[str, Any]]:
-        return self._get("/conversations", default=[])
+    def conversations(self, ids: Sequence[str]) -> list[dict[str, Any]]:
+        if not ids:
+            return []
+        return self._get("/conversations", default=[], params={"ids": list(ids)})
 
     def conversation(self, conversation_id: str) -> list[dict[str, Any]]:
         return self._get(f"/conversations/{conversation_id}", default=[])
@@ -66,13 +76,12 @@ class ApiClient:
         except httpx.HTTPError:
             return False
 
-    def public_link(self, path: str) -> str:
-        """A link the browser opens directly (e.g. a PDF at a page)."""
-        return f"{self._public_url}{path}"
+    def pdf_link(self, pdf_url: str) -> str:
+        return f"{self._public_url}{pdf_url}"
 
-    def _get(self, path: str, default: Any) -> Any:
+    def _get(self, path: str, default: Any, params: dict[str, Any] | None = None) -> Any:
         try:
-            response = self._http.get(path, timeout=READ_TIMEOUT)
+            response = self._http.get(path, params=params, timeout=READ_TIMEOUT)
             return response.json() if response.status_code == 200 else default
         except httpx.HTTPError:
             return default

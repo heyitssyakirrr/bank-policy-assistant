@@ -1,4 +1,4 @@
-"""A response cache for development and evaluation runs.
+"""A response cache for development and evaluation runs (and a public demo).
 
 Re-running the evaluation after changing one prompt should only pay for the
 calls whose input changed. Every external result (LLM answer, query
@@ -6,7 +6,8 @@ embedding, rerank scores) is stored under a hash of everything that
 determines it: the namespace, the model, and the exact input (the full
 prompt text, so a prompt change is a cache miss).
 
-The API never uses it: a live user always gets a fresh answer.
+Live answers skip it by default, so a user gets a fresh answer. A public
+demo turns it on (LIVE_RESPONSE_CACHE), so a repeated question costs no quota.
 """
 
 from __future__ import annotations

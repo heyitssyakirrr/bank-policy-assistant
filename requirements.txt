@@ -9,6 +9,7 @@ psycopg[binary]
 python-multipart
 google-genai
 qdrant-client==1.19.1   # pinned to match the qdrant/qdrant:v1.19.1 server in docker-compose.yml
+tzdata                  # time zones for the daily quota (slim images have none)
 tenacity                # retries for Gemini/Cohere on 429 and 5xx
 cohere                  # reranking (Cohere Rerank API)
 # Agent + LLM layer (versions pinned: the graph and structured-output APIs move fast)
@@ -20,6 +21,6 @@ langchain-google-genai==4.4.2
 langgraph-checkpoint-postgres==3.2.0
 psycopg-pool==3.3.3
 alembic==1.20.1
-# Streamlit UI (talks to the API over HTTP only)
+# Streamlit UI (over HTTP to the API, or the agent in-process on Streamlit Cloud: ui/backend.py)
 streamlit==1.66.1
 httpx==0.28.1

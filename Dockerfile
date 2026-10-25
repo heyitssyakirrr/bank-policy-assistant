@@ -14,6 +14,7 @@ COPY migrations ./migrations
 COPY app ./app
 COPY ui ./ui
 COPY evals ./evals
+COPY .streamlit/config.toml ./.streamlit/config.toml
 
 # Not root: the index job writes only the unpacked data under /srv/app/data.
 RUN useradd --create-home app && chown -R app /srv

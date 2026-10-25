@@ -16,3 +16,5 @@ app/data/interim/embeddings/*
 !app/data/interim/embeddings/*.jsonl.gz
 app/data/processed/*
 !app/data/processed/chunks.jsonl.gz
+.streamlit/secrets.toml
+ui/static

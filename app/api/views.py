@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from app.agent.prompts import applies_to
 from app.agent.schemas import DISCLAIMER
-from app.agent.steps import SHORT_TITLES
+from app.agent.steps import SHORT_TITLES, STEP_TITLES
 from app.db.models import Turn, TurnEvent
 
 SNIPPET_CHARS = 400
@@ -30,6 +30,13 @@ class SourceView(BaseModel):
     provision: str | None  # "S" | "G" | None
     snippet: str
     pdf_url: str  # relative to the API: "/documents/ekyc.pdf#page=8"
+
+
+class StepView(BaseModel):
+    node: str  # "review_evidence"
+    title: str  # "Review": the step timeline's label
+    lines: list[str]  # what the step did, in plain English
+    ms: int  # time since the turn started
 
 
 class StatementView(BaseModel):
@@ -56,7 +63,7 @@ class TurnView(BaseModel):
     applies_to: str
     verified: bool
     notes: list[str]
-    steps: list[str]
+    steps: list[StepView]  # the step timeline (the "finish" node and empty steps left out)
     llm_calls: int
     input_tokens: int
     output_tokens: int
@@ -64,6 +71,13 @@ class TurnView(BaseModel):
     models: list[str]
     disclaimer: str = DISCLAIMER
     created_at: datetime | None = None
+
+
+DOCUMENT_FILES = {
+    "ekyc": "pd-ekyc-apr2024.pdf",
+    "ftfc": "pd-ftfc-mar24.pdf",
+    "amlcft": "PD_AMLCFTCPF_TFS_FI_Feb2024_v2.pdf",
+}
 
 
 def pdf_path(document: str) -> str:
@@ -124,7 +138,11 @@ def turn_view(turn: Turn, events: Sequence[TurnEvent]) -> TurnView:
         applies_to=applies_to(turn.sector),
         verified=bool(verifications) and not verifications[-1].get("serious"),
         notes=turn.notes,
-        steps=[line for event in events for line in event.lines],
+        steps=[
+            StepView(node=e.node, title=STEP_TITLES[e.node], lines=e.lines, ms=e.ms)
+            for e in events
+            if e.node in STEP_TITLES and e.lines
+        ],
         llm_calls=turn.llm_calls,
         input_tokens=turn.input_tokens,
         output_tokens=turn.output_tokens,

@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import ServicesDep
+from app.api.runner import DailyLimitReached
 from app.api.schemas import ChatRequest
 
 router = APIRouter()
@@ -25,8 +26,10 @@ def sse(events: Iterable[dict[str, Any]]) -> Iterator[str]:
 
 @router.post("/chat")
 def chat(request: ChatRequest, services: ServicesDep) -> StreamingResponse:
-    try:  # before the stream starts, so a database failure is a real HTTP error
+    try:  # before the stream starts, so a refusal or a database failure is a real HTTP error
         start = services.runner.start(request.question, request.sector, request.conversation_id)
+    except DailyLimitReached as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=503, detail="The conversation store is unavailable.") from exc
     events = services.runner.stream(start, request.mode, request.sector)

@@ -20,7 +20,6 @@ from fastapi import FastAPI
 from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
-from qdrant_client import QdrantClient
 
 from app.agent.checkpoint import state_serializer
 from app.agent.graph import build_agentic_graph
@@ -34,32 +33,43 @@ from app.core.config import enable_tracing, settings
 from app.core.logging import RequestContextMiddleware, setup_logging
 from app.db.audit_repository import AuditRepository
 from app.db.session import database_ok, make_engine, make_session_factory, psycopg_url
-from app.db.vector_repository import VectorRepository
+from app.db.vector_repository import VectorRepository, connect_qdrant
+from app.llm.cache import ResponseCache
 from app.llm.models import ChatModelClient
 from app.services.search_service import build_search_service
 
 
 def build_services(resources: ExitStack) -> Services:
-    """The real stack. No response cache: a live user always gets a fresh answer.
-    Tracing starts here, not at import, so tests never send runs to LangSmith."""
+    """The real stack, used by the API and by the UI's local backend. Live
+    answers skip the response cache unless LIVE_RESPONSE_CACHE is on (a public
+    deployment, where a repeated question should cost no quota). Tracing
+    starts here, not at import, so tests never send runs to LangSmith."""
     enable_tracing()
     engine = make_engine()
     resources.callback(engine.dispose)
     audit = AuditRepository(make_session_factory(engine))
 
+    # `check`: a pooled connection is tested before use, so a connection a serverless
+    # Postgres (Neon) dropped while idle is replaced instead of failing the next question.
     pool = ConnectionPool(
-        psycopg_url(), kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row}, open=True
+        psycopg_url(),
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        open=True,
+        check=ConnectionPool.check_connection,
+        max_idle=120,
     )
     resources.callback(pool.close)
     checkpointer = PostgresSaver(pool, serde=state_serializer())
     checkpointer.setup()  # LangGraph creates and migrates its own checkpoint tables
 
     graphs = {"agentic": build_agentic_graph(checkpointer), "traditional": build_traditional_graph(checkpointer)}
-    context = AgentContext(llm=ChatModelClient(), search=build_search_service())
+    cache = ResponseCache(settings.response_cache_path) if settings.live_response_cache else None
+    context = AgentContext(llm=ChatModelClient(cache=cache), search=build_search_service(cache))
     version = index_version(settings.chunks_path)
-    vectors = VectorRepository(QdrantClient(url=settings.qdrant_url), settings.qdrant_collection)
+    vectors = VectorRepository(connect_qdrant(), settings.qdrant_collection)
     report = partial(readiness, vectors.count, partial(database_ok, engine), version)
-    return Services(runner=TurnRunner(graphs, context, audit, version), audit=audit, health=report)
+    runner = TurnRunner(graphs, context, audit, version, settings.daily_question_limit, settings.quota_timezone)
+    return Services(runner=runner, audit=audit, health=report)
 
 
 @asynccontextmanager

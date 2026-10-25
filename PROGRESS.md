@@ -4,11 +4,12 @@
 > docs/HANDOFF.md first (where things stand, the system end to end, and how
 > to guide Syakir with `/tour`).
 
-**Last updated:** 2026-10-24
-**Goal:** live Streamlit demo of the agentic RAG, **Mon 26 Oct 2026**
-**Current step:** M7, first full evaluation: **Syakir runs it** (see
-"Next action" below)
-**Tests:** 287 passing
+**Last updated:** 2026-10-26
+**Goal:** submit a deployed Streamlit link + the repo, **Mon 26 Oct 2026**
+**Current step:** deployment (Syakir: accounts, index upload, push,
+docs/DEPLOY.md) and M7, the first full evaluation (Syakir runs it after the
+3 pm quota reset)
+**Tests:** 309 passing
 **Repo:** _(add your GitHub link)_
 
 ---
@@ -102,6 +103,20 @@ packaging.
   passed twice (0 embedding calls, API healthy, UI 200, one real question
   answered). Reviewed by code-reviewer: 4 major + 9 minor findings, all
   fixed.
+- [x] Public deployment mode + UI redesign (26 Oct, added for the submission).
+  `ui/backend.py` (one interface), `ui/local_backend.py` (the TurnRunner in
+  the Streamlit process: alembic upgrade, PDFs into `ui/static/`),
+  `connect_qdrant()` (Qdrant Cloud API key), daily question limit in
+  `TurnRunner.start` (429 from the API), per-visitor limit and history,
+  `LIVE_RESPONSE_CACHE`, structured `TurnView.steps` for a step timeline,
+  redesigned pages without emojis (Ask, Compare modes, Evaluation, How it
+  works) and a theme in `.streamlit/config.toml`. Page tests with
+  Streamlit's AppTest over the scripted stack (`tests/test_ui_local.py`).
+  `docs/DEPLOY.md`: Qdrant Cloud, Neon, Streamlit Cloud, secrets, checks.
+  Visual check in the browser against local Qdrant/Postgres: the FAR
+  question in traditional mode came from the cache (0 API calls).
+- [ ] **Syakir:** create Qdrant Cloud, Neon and Streamlit Cloud accounts,
+  upload the index, push, deploy (docs/DEPLOY.md)
 - [ ] M7 Evaluation #1 (**Syakir runs it** when Claude Code says ready) + fixes
 - [ ] M8 Docs: README, architecture, investigation, testing, demo script,
       BUILD_REPORT, LEARNING_GUIDE
@@ -121,6 +136,7 @@ packaging.
 | 24 Oct 14:57 | M5 smoke report regenerated (all cached) | 0 | 0 | 0 |
 | 24 Oct ~14:40 | M6 clean-clone Docker check: 1 API question (+ 0 embedding calls for indexing) | 2 | 1 | 2 |
 | **24 Oct total (window ending 15:00)** | | **69** | **34** | **39** |
+| 26 Oct ~02:20 | UI redesign visual check: 1 question, answered from the response cache | 0 | 0 | 0 |
 
 ---
 
@@ -220,6 +236,27 @@ bank-policy-assistant/
 ---
 
 ## Decisions log (why things are the way they are)
+
+**Deployment and UI redesign (2026-10-26)**
+- The submission needs a public link. Syakir chose option A: Streamlit
+  Community Cloud running the UI and the agent in one process
+  (`UI_BACKEND=local`), Qdrant Cloud for the index, Neon for Postgres. The
+  FastAPI + Docker stack stays the reference architecture. Rejected: a
+  separate free API host (sleeps, ~1 min cold start) and a self-managed VM
+  (too much setup for one day). See PROJECT_PLAN §5.7 "Public deployment".
+- Quota protection for a public link: shared daily limit from the audit
+  log, per-visitor limit, response cache for live answers.
+- UI redesign without emojis (Syakir: "it looks AI-built"), see §5.7.
+- Reviewed by code-reviewer: 5 major + 8 minor findings, all fixed:
+  the checkpointer pool now checks connections (Neon drops idle ones);
+  the Compare page keeps each side's error across its rerun; a failed
+  start closes what it opened and shows a message; step times are per
+  step, not cumulative; the Docker image copies `.streamlit/config.toml`;
+  the quota day starts at midnight Pacific (`QUOTA_TIMEZONE`, daylight
+  saving included; `tzdata` added); a client leaving right after "start"
+  is now audited (with an empty state, not the previous turn's). Accepted
+  and documented: the daily limit is soft (questions in flight aren't
+  counted yet).
 
 **Autonomous build, M6 (2026-10-24)**
 - See PROJECT_PLAN §5.7 "Packaging". The reviewer found that pytest could

@@ -1,64 +1,112 @@
-"""Chat: ask questions, watch the agent's steps live, read cited answers."""
+"""Ask: questions with cited answers, follow-ups, and the agent's steps live."""
 
 import streamlit as st
 
-from ui.components import api_client, remembered, render_turn, sector_sidebar, stream_turn
+from app.core.config import settings
+from ui.backend import backend
+from ui.components import (
+    can_ask,
+    health_line,
+    mode_setting,
+    my_conversations,
+    questions_left,
+    render_turn,
+    sector_setting,
+    stream_turn,
+)
 
-MODES = {"Agentic": "agentic", "Traditional": "traditional"}
+# Each shows something the agent does: a cross-reference, a sector, a table, a comparison.
+EXAMPLES = {
+    "What does e-KYC paragraph 8.10 require?": "Follows a cross-reference to 8.4",
+    "Can a takaful operator onboard customers without meeting them face to face?": "Picks the takaful rules",
+    "What must a bank do if FAR exceeds 5%?": "Reads the FAR table",
+    "How do the e-KYC verification rules differ from AML's non-face-to-face rules?": "Compares two documents",
+}
+DOCUMENTS = {
+    "e-KYC": "Electronic Know-Your-Customer: remote onboarding, identity verification, FAR.",
+    "Fair Treatment of Financial Consumers": "Board duties, disclosure, complaints, fair conduct.",
+    "AML/CFT/CPF and TFS": "Customer due diligence, sector rules (14A to 14D), reporting.",
+}
 
-api = api_client()
+api = backend()
 state = st.session_state
 state.setdefault("conversation_id", None)
 state.setdefault("turns", [])
 
 
-@st.cache_data(ttl=30)
-def health() -> dict:
-    return api.health()
+def ask_example() -> None:
+    """A clicked example is asked once: the pill is cleared so a rerun can't ask it again."""
+    state.example_question, state.example = state.example, None
 
 
 with st.sidebar:
-    st.title("BNM Policy Assistant")
-    sector = sector_sidebar()
-    mode = MODES[
-        remembered(
-            st.radio,
-            "Mode",
-            list(MODES),
-            "mode_label",
-            help="Agentic: the LLM plans, searches in parallel and reviews the evidence. "
-            "Traditional: one search, then the answer.",
-        )
-    ]
-    if st.button("New chat", use_container_width=True):
+    sector = sector_setting()
+    mode = mode_setting()
+    if st.button("New conversation", icon=":material/add:", width="stretch"):
         state.conversation_id, state.turns = None, []
         st.rerun()
-    st.subheader("History")
-    for conversation in api.conversations()[:15]:
-        if st.button(conversation["title"], key=f"conv-{conversation['id']}", use_container_width=True):
-            state.conversation_id = conversation["id"]
-            state.turns = api.conversation(conversation["id"])
-            st.rerun()
-    status = health()
-    st.caption(
-        f"API: {status['status']}"
-        + (f" · {status['qdrant']['points']:,} passages indexed" if status.get("qdrant", {}).get("ok") else "")
-    )
+    conversations = my_conversations(api)
+    if conversations:
+        st.caption("Your conversations")
+        for conversation in conversations[:15]:
+            current = conversation["id"] == state.conversation_id
+            if st.button(
+                conversation["title"],
+                key=f"conv-{conversation['id']}",
+                type="secondary" if current else "tertiary",
+                width="stretch",
+            ):
+                state.conversation_id = conversation["id"]
+                state.turns = api.conversation(conversation["id"])
+                st.rerun()
+    health_line(api)
 
-st.header("Ask about e-KYC, Fair Treatment or AML/CFT")
-st.caption("Answers come only from three Bank Negara Malaysia policy documents, with paragraph citations.")
+st.title("Policy assistant")
+st.caption(
+    "Answers only from three Bank Negara Malaysia policy documents. Every statement cites its paragraph and "
+    "says whether it is an obligation (MUST) or guidance (MAY). Not legal advice."
+)
 
 for turn in state.turns:
     with st.chat_message("user"):
-        st.write(turn["question"])
+        st.markdown(turn["question"])
     with st.chat_message("assistant"):
-        render_turn(turn, api, show_steps=True)
+        render_turn(turn, api)
 
-if question := st.chat_input("e.g. Can a customer be onboarded without meeting face to face?"):
+question = st.chat_input(
+    "Ask about e-KYC, fair treatment or AML/CFT rules",
+    max_chars=settings.max_question_chars,
+    submit_mode="disable",
+)
+
+if not state.turns:
+    intro = st.empty()
+    with intro.container():
+        with st.container(horizontal=True, gap="medium"):
+            for name, scope in DOCUMENTS.items():
+                with st.container(border=True):
+                    st.markdown(f"**{name}**")
+                    st.caption(scope)
+        st.pills(
+            "Try a question",
+            list(EXAMPLES),
+            key="example",
+            on_change=ask_example,
+            help=" ".join(f"{q} {what}." for q, what in EXAMPLES.items()),
+        )
+        left = questions_left()
+        if left is not None:
+            st.caption(f"{left} questions left in this session.")
+    question = question or state.pop("example_question", None)
+    if question:
+        intro.empty()
+
+if question and can_ask():
     with st.chat_message("user"):
-        st.write(question)
+        st.markdown(question)
     with st.chat_message("assistant"):
-        turn, state.conversation_id = stream_turn(api, question, mode, sector, state.conversation_id)
-        if turn is not None:
-            state.turns.append(turn)
-            st.rerun()  # redraw from history: the new conversation appears in the sidebar
+        asked = stream_turn(api, question, mode, sector, state.conversation_id)
+    state.conversation_id = asked.conversation_id
+    if asked.turn is not None:
+        state.turns.append(asked.turn)
+        st.rerun()  # redraw from history: the conversation appears in the sidebar

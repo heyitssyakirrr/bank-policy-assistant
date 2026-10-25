@@ -6,6 +6,7 @@ import gzip
 import json
 import logging
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,7 +21,7 @@ from app.agent.state import AgentContext
 from app.agent.traditional import build_traditional_graph
 from app.api.deps import Services
 from app.api.routes.health import readiness
-from app.api.runner import TurnRunner, index_version
+from app.api.runner import TurnRunner, index_version, quota_day_start
 from app.api.views import source_view
 from app.core.logging import RequestIdFilter
 from app.db.audit_repository import AuditRepository
@@ -58,16 +59,17 @@ ANSWER = GroundedAnswer(
 
 
 class Harness:
-    def __init__(self, llm, graphs=None):
+    def __init__(self, llm, graphs=None, daily_limit=0):
         engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
         Base.metadata.create_all(engine)
         self.audit = AuditRepository(make_session_factory(engine))
         self.llm = llm
         saver = InMemorySaver(serde=state_serializer())
         graphs = graphs or {"agentic": build_agentic_graph(saver), "traditional": build_traditional_graph(saver)}
-        runner = TurnRunner(graphs, AgentContext(llm=llm, search=FakeSearch(CORPUS)), self.audit, "test-index")
-        services = Services(runner=runner, audit=self.audit, health=lambda: {"status": "ok"})
-        self.client = TestClient(create_app(services))
+        context = AgentContext(llm=llm, search=FakeSearch(CORPUS))
+        runner = TurnRunner(graphs, context, self.audit, "test-index", daily_limit=daily_limit)
+        self.services = Services(runner=runner, audit=self.audit, health=lambda: {"status": "ok"})
+        self.client = TestClient(create_app(self.services))
 
     def chat(self, question, **body):
         response = self.client.post("/chat", json={"question": question, **body})
@@ -90,7 +92,7 @@ def test_chat_streams_start_steps_then_the_answer(harness):
     assert turn["status"] == "answered" and turn["verified"] and turn["applies_to"] == "banking institutions"
     assert turn["statements"][0]["sources"] == ["E1"]
     assert turn["sources"][0]["pdf_url"] == "/documents/ekyc.pdf#page=6" and turn["sources"][0]["provision"] == "S"
-    assert turn["llm_calls"] == 3 and "Citations verified ✓" in turn["steps"]
+    assert turn["llm_calls"] == 3 and ["Citations verified"] in [s["lines"] for s in turn["steps"]]
 
 
 def test_every_turn_and_step_is_written_to_the_audit_log(harness):
@@ -142,13 +144,44 @@ def test_a_failing_graph_reports_an_error_and_is_still_audited():
     assert turn.status == "error" and "qdrant down" in turn.error
 
 
+def test_conversations_can_be_limited_to_one_visitors(harness):
+    mine = harness.chat("Can banks use biometric technology?")[0]["conversation_id"]
+    harness.audit.ensure_conversation(None, "someone else's question", None)
+    listed = harness.client.get("/conversations", params={"ids": [mine]}).json()
+    assert [c["id"] for c in listed] == [mine]
+    assert len(harness.client.get("/conversations").json()) == 2
+
+
+def test_the_daily_limit_refuses_further_questions_with_429():
+    harness = Harness(ScriptedLLM(planner=[plan()], reviewer=[REVIEW], generator=[ANSWER]), daily_limit=1)
+    assert harness.chat("Can banks use biometric technology?")[-1]["type"] == "answer"
+    refused = harness.client.post("/chat", json={"question": "And takaful operators?"})
+    assert refused.status_code == 429 and "3 pm Malaysia time" in refused.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    ("now", "day_start"),
+    [
+        # summer time: midnight Pacific = 07:00 UTC = 3 pm Malaysia
+        (datetime(2026, 10, 26, 8, 30, tzinfo=UTC), datetime(2026, 10, 26, 7, 0, tzinfo=UTC)),  # after the reset
+        (datetime(2026, 10, 26, 6, 59, tzinfo=UTC), datetime(2026, 10, 25, 7, 0, tzinfo=UTC)),  # before it
+        (datetime(2026, 10, 26, 7, 0, tzinfo=UTC), datetime(2026, 10, 26, 7, 0, tzinfo=UTC)),  # exactly at it
+        # winter time (from 1 Nov): midnight Pacific = 08:00 UTC = 4 pm Malaysia
+        (datetime(2026, 11, 3, 7, 30, tzinfo=UTC), datetime(2026, 11, 2, 8, 0, tzinfo=UTC)),
+    ],
+)
+def test_the_quota_day_starts_at_midnight_pacific(now, day_start):
+    assert quota_day_start(now, "America/Los_Angeles") == day_start
+
+
 def test_conversations_are_listed_and_replayed(harness):
     events = harness.chat("Can banks use biometric technology?")
     conversation_id = events[0]["conversation_id"]
     listed = harness.client.get("/conversations").json()
     assert listed[0]["id"] == conversation_id and listed[0]["title"] == "Can banks use biometric technology?"
     [turn] = harness.client.get(f"/conversations/{conversation_id}").json()
-    assert turn["summary"] == ANSWER.summary and turn["steps"]
+    assert turn["summary"] == ANSWER.summary
+    assert [s["title"] for s in turn["steps"]] == ["Plan", "Search", "Review", "Write", "Verify"]
     assert harness.client.get(f"/conversations/{uuid.uuid4()}").status_code == 404
 
 
@@ -187,6 +220,18 @@ def test_a_client_leaving_mid_stream_is_still_audited(harness):
     [turn] = harness.audit.conversation_turns(start.conversation_id)
     assert turn.status == "cancelled" and turn.error == "client disconnected" and turn.llm_calls == 1
     assert [e.node for e in harness.audit.turn_events([turn.id])[turn.id]] == ["understand_question"]
+
+
+def test_a_client_leaving_right_after_start_is_audited_with_no_answer(harness):
+    harness.chat("Can banks use biometric technology?")  # a previous turn in the thread
+    runner = harness.services.runner
+    conversation_id = harness.audit.list_conversations()[0].id
+    start = runner.start("And takaful operators?", None, conversation_id)
+    events = runner.stream(start, "agentic", None)
+    assert next(events)["type"] == "start"
+    events.close()  # the client left before any step
+    turn = harness.audit.conversation_turns(conversation_id)[-1]
+    assert turn.status == "cancelled" and turn.answer == {} and turn.llm_calls == 0  # not the previous turn's
 
 
 def test_an_audit_write_failure_still_delivers_the_answer(harness, monkeypatch):

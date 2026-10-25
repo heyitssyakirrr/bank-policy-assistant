@@ -1,8 +1,9 @@
 """The conversation list (sidebar) and a conversation's past turns."""
 
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import ServicesDep
 from app.api.schemas import ConversationSummary
@@ -12,8 +13,12 @@ router = APIRouter()
 
 
 @router.get("/conversations", response_model=list[ConversationSummary])
-def list_conversations(services: ServicesDep) -> list[ConversationSummary]:
-    return [ConversationSummary.model_validate(c, from_attributes=True) for c in services.audit.list_conversations()]
+def list_conversations(
+    services: ServicesDep, ids: Annotated[list[uuid.UUID] | None, Query(max_length=100)] = None
+) -> list[ConversationSummary]:
+    """Most recent first. `?ids=…&ids=…` lists only those (one visitor's history)."""
+    conversations = services.audit.list_conversations(ids=ids)
+    return [ConversationSummary.model_validate(c, from_attributes=True) for c in conversations]
 
 
 @router.get("/conversations/{conversation_id}", response_model=list[TurnView])

@@ -5,16 +5,10 @@ from fastapi.responses import FileResponse
 
 from app.agent.schemas import DOCUMENT_TITLES
 from app.api.schemas import DocumentInfo
-from app.api.views import pdf_path
+from app.api.views import DOCUMENT_FILES, pdf_path
 from app.core.config import settings
 
 router = APIRouter()
-
-DOCUMENT_FILES = {
-    "ekyc": "pd-ekyc-apr2024.pdf",
-    "ftfc": "pd-ftfc-mar24.pdf",
-    "amlcft": "PD_AMLCFTCPF_TFS_FI_Feb2024_v2.pdf",
-}
 
 
 @router.get("/documents", response_model=list[DocumentInfo])

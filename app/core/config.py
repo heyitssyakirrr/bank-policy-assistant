@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # --- storage
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/bankpolicy"
     qdrant_url: str = "http://localhost:6333"  # becomes http://qdrant:6333 when the app runs in Docker
+    qdrant_api_key: str = ""  # Qdrant Cloud only; the local container has no auth
     qdrant_collection: str = "policy_chunks"  # one collection per embedding model (see indexer)
 
     # --- embeddings ("gemini-embedding-001" or "gemini-embedding-2")
@@ -61,12 +62,20 @@ class Settings(BaseSettings):
     raw_pdf_dir: Path = Path("app/data/raw_pdfs")  # served so citations can open the PDF at the page
     eval_results_dir: Path = Path("evals/results")  # one folder per evaluation run, shown on the Evaluation page
 
-    # --- response cache (development and evaluation only; the API never enables it)
+    # --- response cache (development and evaluation; live answers only with LIVE_RESPONSE_CACHE)
     response_cache_path: Path = Path("app/data/interim/response_cache.sqlite")
+    live_response_cache: bool = False  # public deployment: a repeated question costs no quota
 
-    # --- Streamlit UI: where it calls the API, and the API address the browser uses for PDF links
+    # --- quota protection for a public link (0 = no limit)
+    daily_question_limit: int = 0  # questions per quota day, all visitors together (from the audit log)
+    quota_timezone: str = "America/Los_Angeles"  # Gemini free-tier quotas reset at its midnight
+    questions_per_session: int = 0  # questions per visitor's browser session
+
+    # --- Streamlit UI: "api" calls FastAPI over HTTP; "local" runs the agent in the UI's
+    # own process (Streamlit Community Cloud, which runs a single process)
+    ui_backend: Literal["api", "local"] = "api"
     api_url: str = "http://localhost:8000"  # http://api:8000 inside Docker
-    public_api_url: str = "http://localhost:8000"
+    public_api_url: str = "http://localhost:8000"  # the API address the browser uses for PDF links
 
     # --- LangSmith tracing (optional): every node, prompt, token count and latency
     langsmith_tracing: bool = False

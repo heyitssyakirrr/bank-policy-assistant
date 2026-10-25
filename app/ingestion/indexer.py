@@ -39,7 +39,7 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.db.vector_repository import MODEL_FIELD, StoredPoint, VectorRepository
+from app.db.vector_repository import MODEL_FIELD, StoredPoint, VectorRepository, connect_qdrant
 from app.services.bm25_encoder import Bm25Encoder
 
 logger = logging.getLogger("app.ingestion.indexer")
@@ -199,9 +199,7 @@ def main() -> None:
     args = cli.parse_args()
     setup_logging(settings.log_level)
 
-    # Imported here so tests can use index_chunks() without the Gemini/Qdrant clients.
-    from qdrant_client import QdrantClient
-
+    # Imported here so tests can use index_chunks() without the Gemini client.
     from app.services import embedding_service as emb
 
     started = time.perf_counter()
@@ -210,7 +208,7 @@ def main() -> None:
     uncached = uncached_count(chunks, cache)
     if args.require_cached and uncached:
         raise SystemExit(f"{uncached} chunks have no cached embedding; --require-cached refuses to call Gemini.")
-    client = QdrantClient(url=settings.qdrant_url)
+    client = connect_qdrant()
     for attempt in range(1, QDRANT_WAIT_ATTEMPTS + 1):
         try:
             client.get_collections()  # cheap reachability check

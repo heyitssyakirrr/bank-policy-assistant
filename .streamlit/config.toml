@@ -1,0 +1,40 @@
+# Streamlit settings, read by `streamlit run ui/app.py` from the repository root
+# (locally, in Docker and on Streamlit Community Cloud). Secrets never go here.
+
+[server]
+enableStaticServing = true  # serves ui/static/: the PDFs a citation opens at its page
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = "none"  # visitors see our messages, never a stack trace
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+baseRadius = "0.5rem"
+buttonRadius = "0.5rem"
+showWidgetBorder = true
+showSidebarBorder = true
+linkUnderline = false
+
+[theme.light]
+primaryColor = "#1d4e89"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f6f9"
+textColor = "#1b2430"
+borderColor = "#dde3ea"
+linkColor = "#1d4e89"
+codeBackgroundColor = "#f4f6f9"
+chartCategoricalColors = ["#1d4e89", "#c8742c", "#3f8f6b", "#7a5ea8", "#b3434b", "#5b6b7d"]
+
+[theme.dark]
+primaryColor = "#2f6db5"
+backgroundColor = "#0f1419"
+secondaryBackgroundColor = "#182029"
+textColor = "#e6eaef"
+borderColor = "#2a3440"
+linkColor = "#7fb0e6"
+codeBackgroundColor = "#182029"
+chartCategoricalColors = ["#7fb0e6", "#e09a5b", "#6cc29b", "#a48bd1", "#e0737b", "#9aa7b6"]

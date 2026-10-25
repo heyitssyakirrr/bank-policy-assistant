@@ -229,7 +229,7 @@ def test_every_step_can_be_described():
     ]
     assert lines[0] == "Understanding question: why" and lines[1] == "Split into 2 searches"
     assert sum(line.startswith("Searched all documents") for line in lines) == 2
-    assert lines[-1] == "Citations verified ✓"
+    assert lines[-1] == "Citations verified"
 
 
 def test_generator_reads_the_rewritten_follow_up_question():

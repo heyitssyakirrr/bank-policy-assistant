@@ -528,6 +528,45 @@ Recorded here so the plan stays the source of truth:
     pytest/ruff), not full Docling and torch.
 - **Response cache keys** are `<namespace>:<hash>` (llm, embed_query,
   rerank), so a run can report its real API calls per kind (cache misses).
+- **Public deployment (26 Oct, decided with Syakir):** the submission needs a
+  public link, and Streamlit Community Cloud runs only one Streamlit
+  process. So the UI gets a second backend:
+  - `UI_BACKEND=api` (default, local and Docker): the UI calls FastAPI over
+    HTTP, exactly as before;
+  - `UI_BACKEND=local` (Streamlit Cloud): the UI calls the same `TurnRunner`
+    in its own process, built by the same `build_services()`. Both
+    backends share one interface (`ui/backend.py`), so the pages don't know
+    which one they use. This is a deliberate exception to "the UI never
+    imports the agent", for free hosting; the API stays the reference
+    architecture;
+  - storage: Qdrant Cloud (`QDRANT_URL` + `QDRANT_API_KEY`, indexed from the
+    committed cache with `indexer --require-cached`: 0 Gemini calls) and
+    Neon Postgres (`DATABASE_URL`); the local backend runs
+    `alembic upgrade head` at startup;
+  - PDFs are served by Streamlit's static file serving (copied into
+    `ui/static/` at startup), so citations still open the PDF at the page;
+  - a public link spends the free Gemini quota, so: a daily question limit
+    shared by all visitors (`DAILY_QUESTION_LIMIT`, counted from the audit
+    log since midnight Pacific time, when Gemini's quota resets, enforced by
+    `TurnRunner.start`; the API answers 429), a per-visitor limit
+    (`QUESTIONS_PER_SESSION`, counted when a question starts), and the
+    response cache for live answers (`LIVE_RESPONSE_CACHE`), so repeated
+    questions such as the example buttons cost no quota (they still count
+    towards the limits). The daily limit is soft: questions still running
+    aren't counted yet, so a burst can pass it by a few, which the quota's
+    headroom absorbs;
+  - the checkpointer's connection pool checks a connection before use, so
+    one Neon dropped while idle is replaced; a failed start closes what it
+    opened and shows a clear message;
+  - the sidebar history shows only the visitor's own conversations from
+    this browser session (there are no logins), so visitors never see each
+    other's questions.
+- **UI redesign (26 Oct):** no emojis; Material icons, a restrained theme in
+  `.streamlit/config.toml` (light and dark), example questions for a first
+  visit, agent steps as a step timeline with per-step times (`TurnView.steps`
+  is now structured: node, title, lines, ms), sources as a list with the S/G
+  label, the quote and a PDF link, and friendly messages for limits and
+  errors.
 
 ## 6. Memory and chat history (Postgres)
 
@@ -585,11 +624,11 @@ which keeps prompts small and fast.
   - statements with **MUST** / **MAY** badges and citation chips;
   - a sources panel listing each citation, an S/G badge, a text snippet, and
     an "Open PDF at page" link;
-  - 👍 / 👎 feedback.
-- **"Agent steps"**, a live expander that fills while the agent works:
-  *Understanding question → split into 2 searches → searching e-KYC… →
-  reviewing 9 passages → following cross-reference para 8.4 → writing answer →
-  citations verified ✓*. It also shows latency and LLM calls.
+  - thumbs up / down feedback.
+- **"Agent steps"**, a live step timeline that fills while the agent works:
+  *Plan → Search e-KYC… → Review: following cross-reference para 8.4 →
+  Write → Verify: citations verified*, each step with its time. It also
+  shows latency and LLM calls.
 
 **Page 2, Compare:** one question, with traditional and agentic answers side
 by side, plus their steps, latency and LLM calls. **This is the most

@@ -6,12 +6,16 @@
 
 Events are plain dicts, so the API can send them as Server-Sent Events:
   {"type": "start",  "conversation_id", "turn_id", "mode", "pii_masked"}
-  {"type": "step",   "node", "lines", "ms"}
+  {"type": "step",   "node", "title", "lines", "ms"}
   {"type": "answer", "turn": <TurnView>}
   {"type": "error",  "message", "turn_id"}
 
 Every turn is audited, whatever happens: an answer, a crash ("error"), or
 the client leaving mid-stream ("cancelled", with the steps it got through).
+
+A public deployment can cap the questions per quota day (all visitors
+together): `start` counts today's turns in the audit log and refuses the
+question with DailyLimitReached once the limit is reached.
 
 A conversation is one checkpointer thread per mode ("<conversation>:agentic"),
 so switching modes or the Compare page never mixes two graphs' state. One
@@ -27,11 +31,13 @@ import threading
 import time
 import uuid
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from langgraph.graph.state import CompiledStateGraph
 from pydantic_core import to_jsonable_python
@@ -39,17 +45,33 @@ from pydantic_core import to_jsonable_python
 from app.agent.prompts import PROMPT_VERSION
 from app.agent.schemas import Mode
 from app.agent.state import AgentContext, turn_input
-from app.agent.steps import describe_step
+from app.agent.steps import STEP_TITLES, describe_step
 from app.api.views import turn_view
 from app.core.logging import conversation_id_var, turn_id_var
 from app.core.pii import mask_pii
 from app.db.audit_repository import AuditRepository
-from app.db.models import Turn, TurnEvent
+from app.db.models import Turn, TurnEvent, utcnow
 
 logger = logging.getLogger("app.runner")
 
 BUSY_MESSAGE = "A question is already being answered in this conversation. Please wait for it to finish."
 FAILED_MESSAGE = "Something went wrong answering this question."
+DAILY_LIMIT_MESSAGE = (
+    "Today's question limit for this demo has been reached. It resets at 3 pm Malaysia time "
+    "(4 pm from November); "
+    "questions asked before are still shown in your history."
+)
+
+
+class DailyLimitReached(Exception):
+    """The deployment's questions for this quota day are used up."""
+
+
+def quota_day_start(now: datetime, quota_timezone: str) -> datetime:
+    """When the current quota day began: midnight in the quota's time zone (Gemini's
+    free tier resets at midnight Pacific time, so daylight saving moves it), in UTC."""
+    local = now.astimezone(ZoneInfo(quota_timezone))
+    return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
 
 
 @lru_cache(maxsize=4)
@@ -89,17 +111,28 @@ class TurnRunner:
         context: AgentContext,
         audit: AuditRepository,
         index_version: str,
+        daily_limit: int = 0,
+        quota_timezone: str = "America/Los_Angeles",
+        now: Callable[[], datetime] = utcnow,
     ) -> None:
         self._graphs = graphs
         self._context = context
         self._audit = audit
         self._index_version = index_version
+        self._daily_limit = daily_limit  # 0 = no limit
+        self._quota_timezone = quota_timezone
+        self._now = now
         self._thread_locks: defaultdict[str, threading.Lock] = defaultdict(threading.Lock)
         self._locks_guard = threading.Lock()
 
     def start(self, question: str, sector: str | None, conversation_id: uuid.UUID | None) -> TurnStart:
-        """Mask PII and make sure the conversation exists. Called before the
-        response starts, so a database error becomes a proper HTTP error."""
+        """Check the daily limit, mask PII and make sure the conversation
+        exists. Called before the response starts, so a refusal or a database
+        error becomes a proper HTTP error."""
+        if self._daily_limit:
+            since = quota_day_start(self._now(), self._quota_timezone)
+            if self._audit.count_turns_since(since) >= self._daily_limit:
+                raise DailyLimitReached(DAILY_LIMIT_MESSAGE)
         masked = mask_pii(question)
         conversation_id = self._audit.ensure_conversation(conversation_id, masked.text, sector)
         return TurnStart(conversation_id, uuid.uuid4(), masked.text, masked.masked)
@@ -132,15 +165,17 @@ class TurnRunner:
         events: list[TurnEvent] = []
         error: str | None = None
         status: str | None = None  # None = the answer's own status
-        yield {
-            "type": "start",
-            "conversation_id": str(start.conversation_id),
-            "turn_id": str(start.turn_id),
-            "mode": mode,
-            "pii_masked": start.pii_masked,
-        }
-        try:
+        graph_ran = False  # before it runs, the thread's saved state is the previous turn's
+        try:  # from the first event on, so a client leaving at any point is audited
+            yield {
+                "type": "start",
+                "conversation_id": str(start.conversation_id),
+                "turn_id": str(start.turn_id),
+                "mode": mode,
+                "pii_masked": start.pii_masked,
+            }
             bind_log_context()
+            graph_ran = True
             for chunk in graph.stream(
                 turn_input(start.question, sector), config, context=self._context, stream_mode="updates"
             ):
@@ -158,7 +193,7 @@ class TurnRunner:
                         error=_step_error(update),
                     )
                     events.append(event)
-                    yield {"type": "step", "node": node, "lines": lines, "ms": ms}
+                    yield {"type": "step", "node": node, "title": STEP_TITLES.get(node, node), "lines": lines, "ms": ms}
                     bind_log_context()
         except GeneratorExit:  # the client left: record what happened so far, then stop
             error, status = "client disconnected", "cancelled"
@@ -171,7 +206,8 @@ class TurnRunner:
                 TurnEvent(turn_id=start.turn_id, seq=len(events), node="error", lines=[], output={}, ms=ms, error=error)
             )
         finally:
-            turn = self._turn_row(start, mode, self._final_state(graph, config), started, error, status)
+            state = self._final_state(graph, config) if graph_ran else {}
+            turn = self._turn_row(start, mode, state, started, error, status)
             saved = self._save(turn, events)
 
         if error:

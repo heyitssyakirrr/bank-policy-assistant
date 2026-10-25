@@ -21,3 +21,8 @@ scripts/_parser_trial/
 
 .pytest_cache/
 .ruff_cache/
+
+# Streamlit static serving: the PDFs are copied here at startup (ui/local_backend.py)
+ui/static/
+.streamlit/secrets.toml
+.claude/launch.json

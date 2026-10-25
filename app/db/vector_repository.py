@@ -19,6 +19,7 @@ from typing import Any
 
 from qdrant_client import QdrantClient, models
 
+from app.core.config import settings
 from app.services.bm25_encoder import SparseVec
 
 DENSE = "dense"
@@ -42,6 +43,11 @@ class SearchHit:
     id: str
     score: float
     payload: dict[str, Any]
+
+
+def connect_qdrant() -> QdrantClient:
+    """The configured Qdrant: the local container, or Qdrant Cloud with an API key."""
+    return QdrantClient(url=settings.qdrant_url, api_key=settings.qdrant_api_key or None)
 
 
 def _filter(exclude_tags: Sequence[str] = (), **must_any: Sequence[str]) -> models.Filter | None:

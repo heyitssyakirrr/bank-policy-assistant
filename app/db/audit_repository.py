@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.models import Conversation, Feedback, Turn, TurnEvent, utcnow
@@ -44,10 +45,17 @@ class AuditRepository:
             if conversation is not None:
                 conversation.updated_at = utcnow()
 
-    def list_conversations(self, limit: int = 50) -> list[Conversation]:
+    def list_conversations(self, limit: int = 50, ids: Sequence[uuid.UUID] | None = None) -> list[Conversation]:
+        """Most recent first; `ids` keeps only those conversations (one visitor's)."""
         with self._sessions() as session:
             query = select(Conversation).order_by(Conversation.updated_at.desc()).limit(limit)
+            if ids is not None:
+                query = query.where(Conversation.id.in_(ids))
             return list(session.scalars(query))
+
+    def count_turns_since(self, since: datetime) -> int:
+        with self._sessions() as session:
+            return session.scalar(select(func.count()).select_from(Turn).where(Turn.created_at >= since)) or 0
 
     def conversation_turns(self, conversation_id: uuid.UUID) -> list[Turn]:
         with self._sessions() as session:

@@ -22,10 +22,8 @@ import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from qdrant_client import QdrantClient
-
 from app.core.config import settings
-from app.db.vector_repository import VectorRepository
+from app.db.vector_repository import VectorRepository, connect_qdrant
 from app.llm.cache import ResponseCache
 from app.services.embedding_service import cached_embed_query, embed_query
 from app.services.rerank_service import CachedReranker, CohereReranker, NoReranker, Reranker
@@ -128,7 +126,7 @@ class SearchParts:
 def build_search_parts(cache: ResponseCache | None = None) -> SearchParts:
     """Qdrant + Gemini query embeddings + Cohere. With a cache (development
     and evaluation), repeated queries cost nothing."""
-    repo = VectorRepository(QdrantClient(url=settings.qdrant_url), settings.qdrant_collection)
+    repo = VectorRepository(connect_qdrant(), settings.qdrant_collection)
     reranker: Reranker
     if settings.cohere_api_key:
         reranker = CohereReranker(settings.cohere_api_key, settings.rerank_model, settings.rerank_calls_per_minute)

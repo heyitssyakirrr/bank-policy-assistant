@@ -11,6 +11,18 @@ from __future__ import annotations
 from typing import Any
 
 SHORT_TITLES = {"ekyc": "e-KYC", "ftfc": "FTFC", "amlcft": "AML/CFT"}
+# The step timeline's label for each node; nodes without one (finish) aren't shown.
+STEP_TITLES = {
+    "understand_question": "Plan",
+    "retrieve": "Search",
+    "search_policies": "Search",
+    "lookup_paragraphs": "Look up",
+    "review_evidence": "Review",
+    "generate_answer": "Write",
+    "verify_answer": "Verify",
+    "respond_directly": "Respond",
+    "ask_clarification": "Clarify",
+}
 
 
 def _documents(codes: list[str]) -> str:
@@ -63,7 +75,7 @@ def describe_step(node: str, update: dict[str, Any]) -> list[str]:
             elif update.get("feedback"):
                 lines = [f"Verification found {len(report.serious)} problem(s): regenerating"]
             elif report.passed:
-                lines = ["Citations verified ✓"]
+                lines = ["Citations verified"]
             else:
                 lines = [f"Verification found {len(report.serious)} problem(s): unverified statements removed"]
         case "respond_directly":
