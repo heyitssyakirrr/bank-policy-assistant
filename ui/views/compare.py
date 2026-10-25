@@ -8,7 +8,7 @@ the difference is only in who decides the steps.
 import streamlit as st
 
 from ui.backend import backend
-from ui.components import can_ask, render_turn, sector_setting, stream_turn
+from ui.components import can_ask, render_turn, result_badge, sector_setting, stream_turn
 
 EXAMPLES = [
     "What does e-KYC paragraph 8.10 require?",
@@ -73,7 +73,7 @@ if results.get("question"):
         st.subheader("What each mode did")
         rows = {
             SIDES[mode][0]: {
-                "Status": turn["status"].replace("_", " ").capitalize(),
+                "Result": result_badge(turn)[0],
                 "Statements": len(turn["statements"]),
                 "Sources cited": len(turn["sources"]),
                 "Agent steps": len(turn["steps"]),

@@ -205,11 +205,14 @@ def _quote(snippet: str) -> str:
     return "> " + LIST_START_RE.sub(r"\1\\.", snippet).replace("\n", "\n> ")
 
 
+def result_badge(turn: dict[str, Any]) -> tuple[str, str, str | None]:
+    """(label, colour, icon): a refusal or clarifying question first, else the answer's status."""
+    return OUTCOME_BADGES.get(turn["outcome"]) or STATUS_BADGES.get(turn["status"], ("Unknown", "gray", None))
+
+
 def render_turn(turn: dict[str, Any], backend: Backend, show_steps: bool = True) -> None:
     sources = {s["id"]: s for s in turn["sources"]}
-    label, color, icon = OUTCOME_BADGES.get(turn["outcome"]) or STATUS_BADGES.get(
-        turn["status"], ("Unknown", "gray", None)
-    )
+    label, color, icon = result_badge(turn)
     with st.container(horizontal=True, vertical_alignment="center", gap="small"):
         st.badge(label, color=color, icon=icon)
         if turn["outcome"] == "answer" and turn["statements"]:

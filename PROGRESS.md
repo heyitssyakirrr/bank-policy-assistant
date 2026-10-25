@@ -137,6 +137,7 @@ packaging.
 | 24 Oct ~14:40 | M6 clean-clone Docker check: 1 API question (+ 0 embedding calls for indexing) | 2 | 1 | 2 |
 | **24 Oct total (window ending 15:00)** | | **69** | **34** | **39** |
 | 26 Oct ~02:20 | UI redesign visual check: 1 question, answered from the response cache | 0 | 0 | 0 |
+| 26 Oct (Syakir) | Live Streamlit Cloud check: 8.10, onboarding + takaful follow-up, NRIC, credit-card Compare, 8.10 again (cached); calls estimated from the answers' LLM-call counts | ~11 | ~5 | ~4 |
 
 ---
 
