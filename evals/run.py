@@ -17,6 +17,7 @@ import argparse
 import json
 import subprocess
 import sys
+from collections import Counter
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -46,31 +47,36 @@ FULL_CROSS_CHECK = 15  # gemini-3.8-flash allows 20 calls a day
 
 # Average LLM calls per turn, measured in the M1-M5 smoke runs (traditional: generator, sometimes a
 # regeneration; agentic: planner, 1-2 reviews, generator, sometimes a regeneration).
+# Calls per turn by role (averages from the runs so far).
 EXPECTED_CALLS = {
-    "traditional": {"answer": {"3.5": 1.3}, "refuse": {"3.5": 1.0}, "clarify": {"3.5": 1.0}},
-    "agentic": {"answer": {"3.1": 2.5, "3.5": 1.3}, "refuse": {"3.1": 1.0}, "clarify": {"3.1": 1.0}},
+    "traditional": {"answer": {"generator": 1.3}, "refuse": {"generator": 1.0}, "clarify": {"generator": 1.0}},
+    "agentic": {
+        "answer": {"planner": 1.0, "reviewer": 1.5, "generator": 1.3},
+        "refuse": {"planner": 1.0},
+        "clarify": {"planner": 1.0},
+    },
 }
 WORST_CASE_CALLS = 5  # the request budget: no turn can make more LLM calls than this
 
 
 def estimate(answer_items: Sequence[GoldenItem], modes: Sequence[str], judge: bool, cross_check: int) -> dict[str, Any]:
-    """Expected Gemini calls on a cold cache (averages from the smoke runs), and the worst case."""
-    lite_31 = lite_35 = 0.0
+    """Expected LLM calls per model on a cold cache (averages from the runs so far), and the worst case."""
+    calls: Counter[str] = Counter()
     turns = 0
     for item in answer_items:
         conversation = [*item.previous_turns, item.question]
         for mode in modes:
             for position in range(len(conversation)):
                 outcome = item.expected_outcome if position == len(conversation) - 1 else "answer"
-                lite_31 += EXPECTED_CALLS[mode][outcome].get("3.1", 0)
-                lite_35 += EXPECTED_CALLS[mode][outcome].get("3.5", 0)
+                for role, expected in EXPECTED_CALLS[mode][outcome].items():
+                    calls[role_models(role)[0]] += expected
                 turns += 1
     judged = len(answer_items) * len(modes) if judge else 0  # an unanswerable item answered by mistake is judged too
-    return {
-        "expected gemini-3.1-flash-lite (planner, reviewer, judge)": round(lite_31 + judged),
-        "expected gemini-3.5-flash-lite (generator)": round(lite_35),
-        "gemini-3.8-flash (judge cross-check)": min(cross_check, judged),
-        "worst case, all Lite models": turns * WORST_CASE_CALLS + judged,
+    calls[role_models("judge")[0]] += judged
+    expected = {f"expected {quota_name(model)}": round(n) for model, n in calls.items()}
+    return expected | {
+        f"{quota_name(settings.judge_cross_check_model)} (judge cross-check)": min(cross_check, judged),
+        "worst case, all models": turns * WORST_CASE_CALLS + judged,
     }
 
 
@@ -100,7 +106,8 @@ def judge_turns(turns: list[TurnResult], llm: ChatModelClient, cross: ChatModelC
         turn.faithfulness = faithfulness(turn.verdicts)
         turn.relevancy = result.output.relevancy
         turn.judge_model = result.model
-        turn.self_judged = quota_name(result.model) == quota_name(role_models("generator")[0])
+        # The judge is a model that also answered this turn (e.g. both fell back to the same Gemini model).
+        turn.self_judged = quota_name(result.model) in {quota_name(m) for m in turn.models}
     if cross is None:
         return
     for turn in stratified([t for t in judgeable if t.verdicts], cross_check):
@@ -165,14 +172,12 @@ def main() -> None:
         return
 
     cache = ResponseCache(settings.response_cache_path)
-    # Faithful attribution over speed: no cooldown, and only the asked model's cached answer.
-    llm = ChatModelClient(cache=cache, cooldown_s=0, reuse_fallback_answers=False)
+    # Faithful attribution over speed: no cooldown, so each role's primary is always asked first.
+    llm = ChatModelClient(cache=cache, cooldown_s=0)
     cross = None
     if cross_check:
         cross_model = settings.judge_cross_check_model
-        cross = ChatModelClient(
-            cache=cache, models_for=lambda role: (cross_model, cross_model), cooldown_s=0, reuse_fallback_answers=False
-        )
+        cross = ChatModelClient(cache=cache, models_for=lambda role: (cross_model, cross_model), cooldown_s=0)
     parts = build_search_parts(cache)
     context = AgentContext(llm=llm, search=SearchService(RetrievalService(parts.repo, parts.embed), parts.reranker))
 

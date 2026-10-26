@@ -38,6 +38,10 @@ The reviewer finds the reference; the verifier makes sure the answer uses it.
 
 ## Results (full evaluation: 40 questions × 2 modes)
 
+Measured on 26 Oct with the Gemini models (planner and reviewer
+`gemini-3.1-flash-lite`, generator `gemini-3.5-flash-lite`), before the switch
+to DeepSeek; a re-run on DeepSeek replaces these numbers.
+
 | | Traditional | Agentic |
 |---|---|---|
 | Outcome accuracy (answered, refused or asked to clarify, as expected) | 95% | **100%** |
@@ -70,7 +74,7 @@ PER QUESTION
                                                    │ both use:
                      search engine: exact paragraph lookup + dense + BM25 ─► RRF ─► Cohere rerank
                                     ─► one copy per sector rule (14A/14B/14C/14D)
-                     generator (Gemini) writes statements citing evidence labels E1, E2…
+                     generator (DeepSeek) writes statements citing evidence labels E1, E2…
                      verifier (code) checks every citation, quote, MUST vs G, cross-reference
              ─► each step streamed live ─► Postgres: conversation memory + audit log
 ```
@@ -98,7 +102,7 @@ Details: [docs/architecture.md](docs/architecture.md).
 | Embeddings | Gemini `gemini-embedding-001`, 768 dimensions |
 | Vector store | Qdrant: dense + BM25 sparse vectors, payload filters |
 | Reranker | Cohere `rerank-v4.0-pro` |
-| LLMs | Gemini Flash-Lite: `3.1` (planner, reviewer, judge), `3.5` (generator), each the other's fallback |
+| LLMs | DeepSeek `deepseek-flash` (planner, reviewer, generator; paid, thinking off), with Gemini Flash-Lite as each role's fallback; the judge is Gemini `3.1-flash-lite`, a different model family from the generator |
 | Agent | LangGraph `StateGraph` (LangChain chat models, structured output into Pydantic) |
 | Memory + audit | Postgres: LangGraph `PostgresSaver` + our own tables (Alembic) |
 | API / UI | FastAPI with Server-Sent Events / Streamlit |
@@ -107,7 +111,9 @@ Details: [docs/architecture.md](docs/architecture.md).
 ## Run it
 
 **Docker (the whole stack):** needs Docker Compose 2.24+ and a `.env` with
-`GEMINI_API_KEY` and `COHERE_API_KEY` (see `.env.example`).
+`DEEPSEEK_API_KEY`, `GEMINI_API_KEY` (embeddings, fallback, judge) and
+`COHERE_API_KEY` (see `.env.example`). Without a DeepSeek key every role runs on
+its Gemini fallback.
 
 ```bash
 docker compose up --build
@@ -176,9 +182,10 @@ python -m evals.run --full                # the golden set, both modes, judged
   prints the review count. It is 40 questions, not a large benchmark.
 - **The LLM judge was not cross-checked** in the full run (the second model
   returned 504s), and it is the same model family as the reviewer.
-- **The 60 s limit stops new work, not a call already running:** agentic p95 is
-  69.9 s on the free tier, where `gemini-3.1-flash-lite` often answers "503 high
-  demand" (the app falls back to 3.5 and skips the overloaded model for 120 s).
+- **The 60 s limit stops new work, not a call already running:** agentic p95 was
+  69.9 s on the Gemini free tier, where `gemini-3.1-flash-lite` often answered
+  "503 high demand" (the app falls back and skips an overloaded model for 120 s).
+  This is why the main models moved to paid DeepSeek.
 - **The planner can search too narrowly:** a money-changer question was treated
   as an e-KYC question and missed the AML money-services rule (item sector-4).
 - **Two AML paragraph boundaries are wrong** (14A.14.1 and 14B.16.2 merged into a

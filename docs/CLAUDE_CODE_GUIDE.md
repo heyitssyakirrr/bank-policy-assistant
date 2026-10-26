@@ -32,7 +32,7 @@ set up, what to type, when to check in, and how to learn afterwards.
    git commit -m "Add Claude Code setup and revised plan"
    git switch -c feat/agentic-rag
    ```
-3. **Check that `.env` has** `GEMINI_API_KEY` and `COHERE_API_KEY`. Add
+3. **Check that `.env` has** `DEEPSEEK_API_KEY`, `GEMINI_API_KEY` and `COHERE_API_KEY`. Add
    `LANGSMITH_API_KEY` if you want tracing (free account at
    smith.langchain.com).
 4. **Start Docker Desktop,** then run `docker compose up -d db qdrant` (the databases

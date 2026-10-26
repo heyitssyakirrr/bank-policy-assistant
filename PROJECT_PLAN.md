@@ -572,17 +572,44 @@ Recorded here so the plan stays the source of truth:
   almost every call, so each planner and reviewer step spent ~5–6 s on three
   failed tries before the fallback. Now a model that fails with an outage,
   overload or quota error is tried *last* for `LLM_COOLDOWN_S` (120 s), so
-  only the first step pays; and before any call the cache is checked for an
-  answer from either of the role's models, so a repeated question costs no
-  call even when the earlier answer came from the fallback. A model that
-  answers leaves its cooldown at once. **The evaluation turns both off**
-  (`cooldown_s=0, reuse_fallback_answers=False` in `evals/run.py`): there,
-  faithful attribution beats speed, and a fallback verdict cached during an
-  outage must not stand in for the independent judge on later re-runs.
+  only the first step pays; each model's cached answer is checked when its
+  turn comes, so while the primary cools, the fallback's cached answer costs
+  no call. A model that answers leaves its cooldown at once. **The evaluation
+  turns the cooldown off** (`cooldown_s=0` in `evals/run.py`): the primary is
+  always asked first, so a fallback verdict cached during an outage never
+  stands in for the independent judge on a later re-run.
   Known: a daily-quota 429 cools the model for 120 s at a time (so it is
   retried every 2 minutes until the reset), and after a model's live
   retries give up its failed attempts count as one call in the request
   budget (`ChatModelClient.requests`, the quota ledger, stays exact).
+- **DeepSeek for the planner, reviewer and generator (26 Oct, Syakir's
+  decision):** the Gemini free tier kept answering 503 "high demand", so
+  Syakir paid for DeepSeek. The roles become:
+  - planner, reviewer, generator: `deepseek:deepseek-flash` (DeepSeek V4.1
+    Flash, OpenAI-compatible API, via `langchain-deepseek`);
+  - their fallbacks: `gemini-3.1-flash-lite` (planner, reviewer) and
+    `gemini-3.5-flash-lite` (generator), as before;
+  - judge: still `gemini-3.1-flash-lite` (fallback 3.5), so the judge is a
+    different model family from the generator; cross-check `gemini-3.8-flash`;
+  - embeddings: still `gemini-embedding-001` (DeepSeek has no embedding API,
+    and the index is built with it).
+
+  DeepSeek thinking is **always off**: with thinking on, DeepSeek requires
+  the model's reasoning to be sent back on any follow-up request, which
+  LangChain doesn't do, so the repair retry would be refused; off is also
+  faster and cheaper (no setting: turning it on would break the retry).
+  Structured output goes through DeepSeek tool calling (LangChain maps
+  `json_schema` to it). The OpenAI SDK under DeepSeek gets `max_retries=0`:
+  its own retries would stack under ours. Any refusal by the DeepSeek API
+  that a retry can't fix (bad key, 402 insufficient balance, a rejected
+  option) falls back to Gemini and cools DeepSeek for 120 s, logged as an
+  error. DeepSeek has no free-tier rate limit, so it gets its own
+  `DEEPSEEK_REQUESTS_PER_MINUTE` (Gemini keeps 15). Without `DEEPSEEK_API_KEY`
+  a DeepSeek role falls back to its Gemini model, so tests, CI and a key-less
+  clone keep working. The evaluation records every model that answered a
+  turn, counts answers that used a fallback, and flags a judge that also
+  answered the turn. The prompts were tuned on Gemini, so the evaluation must
+  be re-run on the new models before its numbers are quoted.
 - **UI redesign (26 Oct):** no emojis; Material icons, a restrained theme in
   `.streamlit/config.toml` (light and dark), example questions for a first
   visit, agent steps as a step timeline with per-step times (`TurnView.steps`

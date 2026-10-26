@@ -32,14 +32,17 @@ generator, verifier, tool, evidence (E1…), round.
 |---|---|---|
 | `app/ingestion/` (offline) | PDFs → structured chunks → vectors | Docling, Gemini embeddings, Qdrant |
 | `SearchService` | question → the 5 best passages | Qdrant, Gemini (query embedding), Cohere |
-| `ChatModelClient` | every LLM call: rate limit, cache, retries, fallback, structured output | Gemini via LangChain |
+| `ChatModelClient` | every LLM call: rate limit, cache, retries, fallback, structured output | DeepSeek and Gemini via LangChain |
 | graphs (`app/agent/`) | the decisions: which steps run, in what order | the three above |
 | `TurnRunner` | one question end to end: the daily limit, PII masking (NRIC, card and account numbers), streaming, audit | graphs, Postgres |
 | FastAPI / Streamlit | serving and the UI | `TurnRunner` |
 
 Every external service has exactly one adapter with a timeout, retries and a
 fallback: `vector_repository.py` (Qdrant), `embedding_service.py`,
-`rerank_service.py` (Cohere), `llm/models.py` (Gemini chat), `db/` (Postgres).
+`rerank_service.py` (Cohere), `llm/models.py` (DeepSeek and Gemini chat), `db/`
+(Postgres). The models per role: DeepSeek `deepseek-flash` for the planner,
+reviewer and generator (thinking off), each with a Gemini Flash-Lite fallback;
+the judge is Gemini, a different family from the generator.
 Settings come only from `app/core/config.py`.
 
 ## 2. Offline: from PDF to searchable chunks
@@ -231,6 +234,6 @@ nothing in it is wrong. The MUST check trusts the S/G marker from ingestion
 | Paragraph chunks with a context header | People ask about and cite paragraphs; the header tells the embedding and BM25 which document and section a short rule belongs to. |
 | Hybrid + exact lookup + rerank | Meaning search misses codes like 14A.9.6; BM25 misses paraphrases; the reranker reads question and passage together. |
 | Sector copies collapsed by code | The AML copies are word-for-word the same; without collapsing, one rule fills all 5 slots. |
-| Two models, each the other's fallback, with a cooldown | Separate free-tier quotas; a model that is overloaded is skipped for 120 s instead of retried on every step. |
+| A paid main model with a fallback from another provider, and a cooldown | One provider's outage or overload (the Gemini free tier's 503s) doesn't stop answers; a model that is overloaded is skipped for 120 s instead of retried on every step. |
 | Structured output into Pydantic, then sanitised | Code can branch on fields safely and clip anything out of bounds. |
 | Postgres checkpointer + separate audit tables | Working memory and the product's permanent record have different owners and rules. |

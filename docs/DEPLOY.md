@@ -9,7 +9,7 @@ calls the FastAPI service (`UI_BACKEND=api`). Why: PROJECT_PLAN.md §5.7
 ```
 Browser ──► Streamlit Cloud: ui/app.py ──► TurnRunner ──► agentic / traditional graph
                                               ├─► Qdrant Cloud   (1,219 passages)
-                                              ├─► Gemini, Cohere (your keys, from Secrets)
+                                              ├─► DeepSeek, Gemini, Cohere (your keys, from Secrets)
                                               └─► Neon Postgres  (memory + audit log)
 ```
 
@@ -66,6 +66,7 @@ On share.streamlit.io: **Create app** → deploy from a GitHub repository:
 | Advanced settings → Secrets | the block below, with your values |
 
 ```toml
+DEEPSEEK_API_KEY = "<your DeepSeek key>"
 GEMINI_API_KEY = "<your Gemini key>"
 COHERE_API_KEY = "<your Cohere key>"
 QDRANT_URL = "https://<your-cluster>.cloud.qdrant.io:6333"
@@ -81,10 +82,12 @@ Streamlit passes top-level secrets to the app as environment variables, and
 `app/core/config.py` reads them like `.env`.
 
 **The limits:** an agentic question costs about 3 calls of
-`gemini-3.1-flash-lite` (planner and reviews, 500 a day) and 1–2 of
-`gemini-3.5-flash-lite` (the generator). 80 questions a day leaves room for an
-evaluation run on the same quota day. Raise `DAILY_QUESTION_LIMIT` after
-the evaluation is done. A question asked before is answered from the cache
+`deepseek-flash` (planner and reviews) and 1–2 more (the generator): DeepSeek
+is paid per token and has no daily cap, so the limit now protects your bill
+rather than a quota (an agentic question is about 5,000 tokens, a fraction of
+a cent). Gemini is only the fallback, the judge and the embeddings (free tier,
+500 calls a day per model). Raise `DAILY_QUESTION_LIMIT` if you want more
+visitors per day. A question asked before is answered from the cache
 for free, though it still counts towards both limits.
 The per-visitor limit counts questions in one browser session: a reload
 starts a new session. The daily limit resets at midnight Pacific time, when

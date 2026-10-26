@@ -250,6 +250,13 @@ bank-policy-assistant/
 
 ## Decisions log (why things are the way they are)
 
+**DeepSeek as the main LLM (2026-10-26)**
+- Syakir paid for DeepSeek after the Gemini free tier's repeated 503s.
+  Planner, reviewer and generator use `deepseek-flash` (thinking off); Gemini
+  stays as their fallback, the judge and the embeddings. See PROJECT_PLAN §5.7
+  "DeepSeek". The M7 numbers are Gemini's; the evaluation is re-run on
+  DeepSeek before the docs quote new ones.
+
 **M7 fix: the document named in the question (2026-10-26)**
 - lookup-3: "paragraph 9.1 of the Fair Treatment … policy" put e-KYC 9.1 and
   AML 9.1 above FTFC 9.1. The traditional mode now orders the exact matches

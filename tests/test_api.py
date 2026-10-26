@@ -287,7 +287,8 @@ def test_readiness_reports_degraded_without_spending_quota():
     report = readiness(qdrant_down, lambda: True, "abc123")
     assert report["status"] == "degraded" and report["qdrant"]["points"] is None
     assert readiness(lambda: 1219, lambda: True, "abc123")["status"] == "ok"
-    assert set(report["keys"]) == {"gemini", "cohere"} and all(isinstance(v, bool) for v in report["keys"].values())
+    assert set(report["keys"]) == {"deepseek", "gemini", "cohere"}
+    assert all(isinstance(v, bool) for v in report["keys"].values())
 
 
 def test_index_version_hashes_the_chunks_or_their_gzip(tmp_path):

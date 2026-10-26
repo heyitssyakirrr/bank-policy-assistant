@@ -3,13 +3,24 @@ fake chat model returns scripted raw/parsed responses or raises."""
 
 import threading
 
+import httpx
+import openai
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from pydantic import BaseModel
 
+from app.core.config import settings
 from app.core.retry import is_transient
 from app.llm.cache import ResponseCache
-from app.llm.models import ChatModelClient, LLMUnavailableError
+from app.llm.models import (
+    ChatModelClient,
+    LLMUnavailableError,
+    build_chat_model,
+    provider_options,
+    requests_per_minute,
+    role_models,
+    thinking_for_model,
+)
 from app.llm.rate_limit import SlidingWindowLimiter
 
 
@@ -60,17 +71,16 @@ def no_backoff_sleep(monkeypatch):
     monkeypatch.setattr("time.sleep", lambda seconds: None)
 
 
-def client(scripts, cache=None, clock=lambda: 0.0, reuse_fallback_answers=True):
+def client(scripts, cache=None, clock=lambda: 0.0, cooldown_s=120):
     chats = {model: FakeChat(script) for model, script in scripts.items()}
     llm = ChatModelClient(
         cache=cache,
         build=lambda model, thinking: chats[model],
         models_for=lambda role: ("primary", "backup"),
         thinking_for=lambda role: "low",
-        requests_per_minute=1000,
-        cooldown_s=120,
+        rate_for=lambda model: 1000,
+        cooldown_s=cooldown_s,
         clock=clock,
-        reuse_fallback_answers=reuse_fallback_answers,
     )
     return llm, chats
 
@@ -198,18 +208,18 @@ def test_the_primarys_cached_answer_wins_when_both_are_cached(tmp_path):
     cache = ResponseCache(tmp_path / "cache.sqlite")
     down, _ = client({"primary": [Coded(503)] * 3, "backup": [ok("backup")]}, cache)
     down.invoke("planner", MESSAGES, Answer)
-    up, _ = client({"primary": [ok("primary")], "backup": []}, cache, reuse_fallback_answers=False)
+    up, _ = client({"primary": [ok("primary")], "backup": []}, cache)  # a new process: the primary first
     up.invoke("planner", MESSAGES, Answer)  # caches the primary's answer
     fresh, _ = client({"primary": [], "backup": []}, cache)
     assert fresh.invoke("planner", MESSAGES, Answer).model == "primary"
 
 
-def test_evaluation_settings_ask_the_primary_again_instead_of_reusing_the_fallback(tmp_path):
+def test_after_an_outage_the_primary_is_asked_again_not_replaced_by_the_fallbacks_cache(tmp_path):
     cache = ResponseCache(tmp_path / "cache.sqlite")
     down, _ = client({"primary": [Coded(503)] * 3, "backup": [ok("self-judged")]}, cache)
     down.invoke("judge", MESSAGES, Answer)  # an outage: the fallback answered and was cached
-    faithful, _ = client({"primary": [ok("independent")], "backup": []}, cache, reuse_fallback_answers=False)
-    result = faithful.invoke("judge", MESSAGES, Answer)
+    evaluation, _ = client({"primary": [ok("independent")], "backup": []}, cache, cooldown_s=0)
+    result = evaluation.invoke("judge", MESSAGES, Answer)
     assert result.model == "primary" and result.output.text == "independent"
 
 
@@ -219,13 +229,12 @@ def test_a_malformed_answer_does_not_put_a_model_in_cooldown():
     assert llm.invoke("planner", [HumanMessage(content="another")], Answer).model == "primary"
 
 
-def test_a_cached_answer_from_the_fallback_is_used_without_calling_the_primary(tmp_path):
+def test_while_the_primary_cools_the_fallbacks_cached_answer_costs_nothing(tmp_path):
     cache = ResponseCache(tmp_path / "cache.sqlite")
     llm, _ = client({"primary": [RateLimited()] * 3, "backup": [ok("from backup")]}, cache)
     llm.invoke("planner", MESSAGES, Answer)  # the primary was down: the backup's answer is cached
-    again, _ = client({"primary": [], "backup": []}, cache)  # a new process: no cooldown remembered
-    result = again.invoke("planner", MESSAGES, Answer)
-    assert result.cached and result.model == "backup" and again.requests == {}
+    result = llm.invoke("planner", MESSAGES, Answer)  # the same question while the primary cools
+    assert result.cached and result.model == "backup" and llm.requests == {"primary": 3, "backup": 1}
 
 
 def test_a_different_prompt_is_a_cache_miss(tmp_path):
@@ -301,8 +310,100 @@ def test_each_role_gets_its_own_thinking_level_and_cache_key(tmp_path):
         build=build,
         models_for=lambda role: ("same-model", "same-model"),
         thinking_for=lambda role: "medium" if role == "generator" else "low",
-        requests_per_minute=1000,
+        rate_for=lambda model: 1000,
     )
     assert llm.invoke("planner", MESSAGES, Answer).output.text == "low"
     assert llm.invoke("generator", MESSAGES, Answer).output.text == "medium"  # same prompt, not a cache hit
     assert built == [("same-model", "low"), ("same-model", "medium")]
+
+
+# ---------------------------------------------------------------- providers (DeepSeek, Gemini)
+
+REQUEST = httpx.Request("POST", "https://api.deepseek.com/chat/completions")
+
+
+def openai_error(cls, status):
+    return cls("rejected", response=httpx.Response(status, request=REQUEST), body=None)
+
+
+def test_deepseek_gets_its_key_thinking_off_and_no_sdk_retries(monkeypatch):
+    monkeypatch.setattr(settings, "deepseek_api_key", "ds-key")
+    thinking = thinking_for_model("deepseek:deepseek-flash", "medium")  # the role's Gemini level doesn't apply
+    options = provider_options("deepseek:deepseek-flash", thinking)
+    assert options == {"api_key": "ds-key", "extra_body": {"thinking": {"type": "disabled"}}, "max_retries": 0}
+    built = build_chat_model("deepseek:deepseek-flash", thinking)
+    assert built.max_retries == 0 and built.extra_body == {"thinking": {"type": "disabled"}}
+
+
+def test_gemini_keeps_its_own_key_and_thinking_level(monkeypatch):
+    monkeypatch.setattr(settings, "gemini_api_key", "g-key")
+    thinking = thinking_for_model("google_genai:gemini-3.1-flash-lite", "low")
+    options = provider_options("google_genai:gemini-3.1-flash-lite", thinking)
+    assert options == {"api_key": "g-key", "thinking_config": {"thinking_level": "low"}, "max_retries": 1}
+
+
+def test_the_cache_key_carries_what_each_model_actually_uses(tmp_path):
+    built = []
+
+    def build(model, thinking):
+        built.append((model, thinking))
+        return FakeChat([openai_error(openai.BadRequestError, 400)] if model == "deepseek:x" else [ok(thinking)])
+
+    llm = ChatModelClient(
+        cache=ResponseCache(tmp_path / "c.sqlite"),
+        build=build,
+        models_for=lambda role: ("deepseek:x", "google_genai:y"),
+        thinking_for=lambda role: "medium",
+        rate_for=lambda model: 1000,
+    )
+    assert llm.invoke("generator", MESSAGES, Answer).output.text == "medium"
+    assert built == [("deepseek:x", "disabled"), ("google_genai:y", "medium")]
+
+
+def test_a_deepseek_role_without_a_key_runs_on_its_gemini_fallback(monkeypatch):
+    monkeypatch.setattr(settings, "planner_model", "deepseek:deepseek-flash")
+    monkeypatch.setattr(settings, "planner_fallback_model", "google_genai:gemini-3.1-flash-lite")
+    monkeypatch.setattr(settings, "deepseek_api_key", "")
+    assert role_models("planner") == ("google_genai:gemini-3.1-flash-lite",) * 2
+    monkeypatch.setattr(settings, "deepseek_api_key", "ds-key")
+    assert role_models("planner") == ("deepseek:deepseek-flash", "google_genai:gemini-3.1-flash-lite")
+
+
+def test_each_provider_is_paced_by_its_own_limit(monkeypatch):
+    monkeypatch.setattr(settings, "deepseek_requests_per_minute", 120)
+    monkeypatch.setattr(settings, "llm_requests_per_minute", 15)
+    assert requests_per_minute("deepseek:deepseek-flash") == 120
+    assert requests_per_minute("google_genai:gemini-3.5-flash-lite") == 15
+
+
+@pytest.mark.parametrize(
+    ("exc", "transient"),
+    [
+        (openai_error(openai.RateLimitError, 429), True),
+        (openai_error(openai.InternalServerError, 503), True),
+        (openai.APITimeoutError(request=REQUEST), True),
+        (openai.APIConnectionError(request=REQUEST), True),
+        (openai_error(openai.BadRequestError, 400), False),
+    ],
+)
+def test_deepseek_sdk_errors_are_classified(exc, transient):
+    assert is_transient(exc) is transient
+
+
+@pytest.mark.parametrize(
+    ("cls", "status"),
+    [
+        (openai.AuthenticationError, 401),
+        (openai.APIStatusError, 402),  # insufficient balance: no class of its own in the SDK
+        (openai.NotFoundError, 404),
+        (openai.BadRequestError, 400),
+        (openai.UnprocessableEntityError, 422),
+    ],
+)
+def test_a_request_deepseek_rejects_goes_to_the_fallback_and_cools(cls, status):
+    llm, _ = client({"primary": [openai_error(cls, status)], "backup": [ok("from gemini"), ok("again")]})
+    result = llm.invoke("planner", MESSAGES, Answer)
+    assert result.model == "backup" and result.output.text == "from gemini"
+    assert llm.requests == {"primary": 1, "backup": 1}  # not retried: it won't change
+    llm.invoke("reviewer", MESSAGES, Answer)  # the refused provider isn't asked again for a while
+    assert llm.requests == {"primary": 1, "backup": 2}

@@ -113,12 +113,15 @@ untested behaviour.
     After he runs it, analyse the results and fix the failures.
   - Use the response cache for every repeated run. Log every real run in
     the quota ledger.
-- **Models:**
-  - planner, reviewer, judge: `gemini-3.1-flash-lite`;
-  - generator: `gemini-3.5-flash-lite`;
-  - each is the other's fallback;
-  - judge cross-check only: `gemini-3.8-flash` (20/day);
+- **Models (changed 26 Oct by Syakir, see PROJECT_PLAN §5.7 "DeepSeek"):**
+  - planner, reviewer, generator: `deepseek-flash` (paid, thinking off);
+  - their fallbacks: `gemini-3.1-flash-lite` (planner, reviewer),
+    `gemini-3.5-flash-lite` (generator);
+  - judge: `gemini-3.1-flash-lite` (fallback 3.5), a different family from
+    the generator; cross-check only: `gemini-3.8-flash` (20/day);
   - embeddings: `gemini-embedding-001`, 768 dimensions (fixed).
+  - DeepSeek is paid: smoke checks still stay small, and log its calls in the
+    quota ledger too.
 
 ## Environment
 - Windows, PowerShell, Python 3.12, `.venv`. Docker Desktop runs Postgres

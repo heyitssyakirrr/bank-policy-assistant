@@ -7,7 +7,8 @@ import pytest
 from app.agent.evidence import merge_evidence, to_evidence
 from app.agent.schemas import GroundedAnswer, Statement
 from app.agent.state import AgentContext
-from app.llm.models import LLMUnavailableError
+from app.core.config import settings
+from app.llm.models import LLMUnavailableError, quota_name, role_models
 from app.services.rerank_service import RerankScore
 from app.services.search_service import SearchParts
 from evals.answer_eval import TurnResult, evaluate_answers
@@ -182,8 +183,8 @@ def test_estimate_counts_follow_up_turns_and_the_judge():
     items = {i.id: i for i in load_golden()}
     one = estimate([items["fact-6"]], ["agentic"], judge=True, cross_check=0)
     follow_up = estimate([items["followup-1"]], ["agentic"], judge=True, cross_check=0)
-    key = "expected gemini-3.1-flash-lite (planner, reviewer, judge)"
-    assert follow_up[key] > one[key] and follow_up["worst case, all Lite models"] == 2 * 5 + 1
+    key = f"expected {quota_name(role_models('planner')[0])}"  # whichever model the planner uses here
+    assert follow_up[key] > one[key] and follow_up["worst case, all models"] == 2 * 5 + 1
 
 
 def test_cross_check_sample_covers_every_category():
@@ -339,3 +340,30 @@ def test_ablation_stages_on_a_fake_search():
     assert not errors and set(by_stage) == set(STAGES)
     assert by_stage["dense only"].mrr == 0.5 and by_stage["+ exact lookup"].ranked[0] == "ekyc:8.4"
     assert by_stage["+ rerank"].mrr == 1.0 and by_stage["+ selection"].hit == 1.0
+
+
+def test_a_judge_that_also_answered_the_turn_is_flagged_as_self_judged():
+    # The fake judge reports "fake-judge": a turn whose answer came (partly) from that model is self-judged.
+    fell_back = turn(item_id="a", answer=GOOD, models=["deepseek:deepseek-flash", "fake-judge"])
+    independent = turn(item_id="b", answer=GOOD, models=["deepseek:deepseek-flash"])
+    judge_turns([fell_back, independent], CountingLLM(judge=[judgement(1), judgement(1)]), None, cross_check=0)
+    assert fell_back.self_judged and not independent.self_judged
+
+
+def test_answers_that_used_a_fallback_model_are_counted():
+    primaries = frozenset({"deepseek:deepseek-flash"})
+    turns = [
+        turn(item_id="a", models=["deepseek:deepseek-flash"]),
+        turn(item_id="b", models=["deepseek:deepseek-flash", "google_genai:gemini-3.5-flash-lite"]),
+    ]
+    assert mode_summary(turns, primaries)["fallback_answers"] == 1
+
+
+@pytest.mark.parametrize("deepseek_key", ["", "ds-key"])
+def test_the_estimate_books_calls_on_the_models_that_will_answer(monkeypatch, deepseek_key):
+    monkeypatch.setattr(settings, "deepseek_api_key", deepseek_key)
+    calls = estimate([load_golden()[0]], ["agentic"], judge=True, cross_check=0)
+    planner = quota_name(role_models("planner")[0])
+    judge = quota_name(role_models("judge")[0])
+    assert f"expected {planner}" in calls and f"expected {judge}" in calls
+    assert (planner == "deepseek-flash") is bool(deepseek_key)  # no key: the Gemini fallback answers

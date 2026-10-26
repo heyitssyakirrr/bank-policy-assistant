@@ -1,7 +1,7 @@
 """The one adapter every LLM call goes through.
 
-    role ("planner") ──► cached answer from the role's model or its fallback? ──► done
-         ──► model from settings ──► rate limiter (shared per model)
+    role ("planner") ──► the role's models, a cooling one last ──► each: cached answer? ──► done
+         ──► rate limiter (shared per model)
          ──► call with live retries ──► validated Pydantic object
                      └─ malformed JSON: 1 repair retry
          primary model failing (quota, outage) ──► the role's fallback model
@@ -22,6 +22,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, Protocol
 
+import openai
 from langchain.chat_models import init_chat_model
 from langchain_core.exceptions import ModelNotFoundError, ModelPermissionDeniedError
 from langchain_core.language_models import BaseChatModel
@@ -76,37 +77,74 @@ class LLMUnavailableError(Exception):
 
 
 # Errors another model can avoid (besides quota and outages, which are
-# transient): invalid output, or this model being unknown or not enabled.
-_MODEL_SPECIFIC_ERRORS = (StructuredOutputError, ModelNotFoundError, ModelPermissionDeniedError)
+# transient): invalid output, this model being unknown or not enabled, or any
+# refusal by the OpenAI-compatible API (DeepSeek: a bad key, 402 "insufficient
+# balance", an option it rejects): the fallback is another provider.
+_MODEL_SPECIFIC_ERRORS = (StructuredOutputError, ModelNotFoundError, ModelPermissionDeniedError, openai.APIStatusError)
 
 
 def role_models(role: Role) -> tuple[str, str]:
-    """(primary, fallback) for a role, from settings."""
-    return getattr(settings, f"{role}_model"), getattr(settings, f"{role}_fallback_model")
+    """(primary, fallback) for a role, from settings. A DeepSeek primary without
+    a DeepSeek key is skipped, so a key-less setup (tests, CI, a fresh clone)
+    runs on the Gemini fallback instead of failing every call."""
+    primary, fallback = getattr(settings, f"{role}_model"), getattr(settings, f"{role}_fallback_model")
+    return (primary, fallback) if configured(primary) else (fallback, fallback)
+
+
+def configured(model: str) -> bool:
+    return not is_deepseek(model) or bool(settings.deepseek_api_key)
+
+
+def is_deepseek(model: str) -> bool:
+    return model.startswith("deepseek:")
 
 
 def role_thinking(role: Role) -> str:
     return getattr(settings, f"{role}_thinking_level")
 
 
-def build_chat_model(model: str, thinking_level: str) -> BaseChatModel:
-    """ "google_genai:gemini-3.1-flash-lite" -> a LangChain chat model. Retries
-    are ours (retry_live), so the SDK makes a single attempt per request."""
-    provider_options = (
-        {"thinking_config": {"thinking_level": thinking_level}} if model.startswith("google_genai:") else {}
-    )
-    return init_chat_model(
-        model,
-        api_key=settings.gemini_api_key or None,
-        timeout=settings.llm_timeout_s,
-        max_retries=1,
-        **provider_options,
-    )
+# DeepSeek thinks unless told not to. With thinking on, it requires the model's
+# reasoning to be sent back on any follow-up request, which LangChain doesn't do
+# (the repair retry would be refused), so it is always off.
+DEEPSEEK_THINKING = "disabled"
+
+
+def thinking_for_model(model: str, role_level: str) -> str:
+    """What the model actually uses: DeepSeek's fixed switch, or the role's Gemini level."""
+    return DEEPSEEK_THINKING if is_deepseek(model) else role_level
+
+
+def provider_options(model: str, thinking: str) -> dict[str, Any]:
+    """Each provider's key, reasoning switch and SDK retries (ours are retry_live,
+    so the SDK must not add its own: the OpenAI SDK's max_retries=1 is 2 attempts)."""
+    if is_deepseek(model):
+        return {
+            "api_key": settings.deepseek_api_key or None,
+            "extra_body": {"thinking": {"type": thinking}},
+            "max_retries": 0,
+        }
+    if model.startswith("google_genai:"):
+        return {
+            "api_key": settings.gemini_api_key or None,
+            "thinking_config": {"thinking_level": thinking},
+            "max_retries": 1,  # the Gemini client's single attempt
+        }
+    return {}
+
+
+def build_chat_model(model: str, thinking: str) -> BaseChatModel:
+    """ "deepseek:deepseek-flash" or "google_genai:gemini-3.1-flash-lite" -> a LangChain chat model."""
+    return init_chat_model(model, timeout=settings.llm_timeout_s, **provider_options(model, thinking))
 
 
 def quota_name(model: str) -> str:
     """'google_genai:gemini-3.1-flash-lite' -> 'gemini-3.1-flash-lite': quotas are per model."""
     return model.split(":", 1)[-1]
+
+
+def requests_per_minute(model: str) -> int:
+    """The pace for a model: DeepSeek is paid with no fixed limit; Gemini's free tier allows 15."""
+    return settings.deepseek_requests_per_minute if is_deepseek(model) else settings.llm_requests_per_minute
 
 
 def _serialise(messages: Sequence[BaseMessage]) -> list[tuple[str, Any]]:
@@ -126,25 +164,23 @@ class ChatModelClient:
         models_for: Callable[[Role], tuple[str, str]] = role_models,
         thinking_for: Callable[[Role], str] = role_thinking,
         method: str = settings.structured_output_method,
-        requests_per_minute: int = settings.llm_requests_per_minute,
+        rate_for: Callable[[str], int] = requests_per_minute,
         cooldown_s: float = settings.llm_cooldown_s,
         clock: Callable[[], float] = time.monotonic,
-        reuse_fallback_answers: bool = True,
     ) -> None:
-        """For live answers, speed comes first: a model in its cooldown is tried last,
-        and a cached answer from either of the role's models is used straight away.
-        Evaluation passes `cooldown_s=0, reuse_fallback_answers=False`, so every
-        answer is attributed to the model that should give it (e.g. the judge
-        isn't silently replaced by the generator's model for later re-runs)."""
+        """Each model's cached answer is checked when that model's turn comes, in the
+        order the models are tried: the primary first, unless it is cooling after
+        a failure (then its fallback's cached answer is used straight away).
+        Evaluation passes `cooldown_s=0`, so the primary is always asked first and
+        every answer is attributed to the model that should give it."""
         self._cache = cache
         self._build = build
         self._models_for = models_for
         self._thinking_for = thinking_for
         self._method = method
-        self._rpm = requests_per_minute
+        self._rate_for = rate_for
         self._cooldown_s = cooldown_s
         self._clock = clock
-        self._reuse_fallback_answers = reuse_fallback_answers
         self._cooling_until: dict[str, float] = {}  # model -> when it may be tried first again
         self._chat_models: dict[tuple[str, str], BaseChatModel] = {}
         self._lock = threading.Lock()
@@ -152,26 +188,25 @@ class ChatModelClient:
 
     def invoke[T: BaseModel](self, role: Role, messages: Sequence[BaseMessage], schema: type[T]) -> LLMResult[T]:
         models = list(dict.fromkeys(self._models_for(role)))  # same model twice = no fallback
-        thinking = self._thinking_for(role)
-        keys = {model: self._cache_key(model, thinking, messages, schema) for model in models}
-        if self._reuse_fallback_answers:  # an answer either model already gave costs nothing
-            for model in models:
-                if (hit := self._cached(keys[model], schema, model)) is not None:
-                    return hit
+        thinking = {model: thinking_for_model(model, self._thinking_for(role)) for model in models}
+        keys = {model: self._cache_key(model, thinking[model], messages, schema) for model in models}
         errors: list[str] = []
         failed_calls = 0
         for model in sorted(models, key=self._cooling):  # stable: a cooling model just moves last
             if (hit := self._cached(keys[model], schema, model)) is not None:
                 return hit
             try:
-                result = self._invoke_model(model, thinking, messages, schema, keys[model])
+                result = self._invoke_model(model, thinking[model], messages, schema, keys[model])
             except Exception as exc:
-                if not (isinstance(exc, _MODEL_SPECIFIC_ERRORS) or is_transient(exc)):
-                    raise  # a bad request or bad key won't be fixed by another model
-                if is_transient(exc) and self._cooldown_s:  # overloaded or out of quota: spare the next steps
+                transient = is_transient(exc)
+                if not (transient or isinstance(exc, _MODEL_SPECIFIC_ERRORS)):
+                    raise  # e.g. a bug in our own request: another model won't fix it
+                # Overloaded, out of quota, or refused by the provider (key, balance): spare the next steps.
+                if (transient or isinstance(exc, openai.APIStatusError)) and self._cooldown_s:
                     with self._lock:
                         self._cooling_until[model] = self._clock() + self._cooldown_s
-                logger.warning(f"{role} on {model} failed ({type(exc).__name__}: {exc}); trying fallback")
+                level = logging.WARNING if transient else logging.ERROR  # a permanent refusal needs fixing
+                logger.log(level, f"{role} on {model} failed ({type(exc).__name__}: {exc}); trying fallback")
                 errors.append(f"{model}: {type(exc).__name__}")
                 failed_calls += getattr(exc, "calls", 1)
                 continue
@@ -232,7 +267,7 @@ class ChatModelClient:
 
     @retry_live()
     def _call(self, model: str, runnable: Any, conversation: list[BaseMessage]) -> dict[str, Any]:
-        shared_limiter(quota_name(model), self._rpm).acquire()
+        shared_limiter(quota_name(model), self._rate_for(model)).acquire()
         with self._lock:
             self.requests[model] += 1
         return runnable.invoke(conversation)

@@ -1,4 +1,4 @@
-"""Retry policies for every external API (Gemini, Cohere).
+"""Retry policies for every external API (DeepSeek, Gemini, Cohere).
 
 Free tiers return 429 "too many requests" and the occasional 500/503, and
 networks time out. Those are temporary: waiting and trying again works.
@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 
 import httpx
+import openai
 from tenacity import (
     before_sleep_log,
     retry,
@@ -32,8 +33,10 @@ LIVE_ATTEMPTS = 3
 
 def is_transient(exc: BaseException) -> bool:
     """Works for SDKs that put the HTTP status on .code or .status_code, and for
-    LangChain's model errors, which say themselves whether a retry can help."""
-    if isinstance(exc, TimeoutError | httpx.TimeoutException | httpx.TransportError):
+    LangChain's model errors, which say themselves whether a retry can help.
+    The OpenAI SDK (DeepSeek) wraps network failures in APIConnectionError
+    (APITimeoutError is one), which carries no status."""
+    if isinstance(exc, TimeoutError | httpx.TimeoutException | httpx.TransportError | openai.APIConnectionError):
         return True
     if getattr(exc, "is_retryable", False):
         return True

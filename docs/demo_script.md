@@ -101,8 +101,8 @@ without any API key.
 | What fails today? | sector-4 (the planner narrowed the search), the FTFC good-practice boxes carrying S, a golden set not yet checked by a person, and a judge that wasn't cross-checked. | [README, known limits](../README.md#known-limits) |
 
 ## If something goes wrong
-- **Slow or "high demand" errors:** the free Gemini model is overloaded; the app
-  falls back to the other model and skips the overloaded one for 2 minutes. The
+- **Slow or "high demand" errors:** a model is overloaded; the app falls back to
+  the other provider's model and skips the overloaded one for 2 minutes. The
   questions you warmed up replay from the cache; otherwise use the screenshots
   in `docs/screenshots/`.
 - **Daily limit reached:** the demo's free quota is used up; it resets at 3 pm

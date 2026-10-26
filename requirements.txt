@@ -17,6 +17,9 @@ langgraph==1.2.16
 langchain==1.4.7              # init_chat_model: provider-agnostic chat models
 langchain-core==1.7.0
 langchain-google-genai==4.4.2
+langchain-deepseek==1.1.1        # DeepSeek (OpenAI-compatible API): planner, reviewer, generator
+langchain-openai==1.7.2          # used by langchain-deepseek
+openai==3.37.0                   # its error classes decide retry vs fallback (app/core/retry.py)
 # Memory + audit (Postgres)
 langgraph-checkpoint-postgres==3.2.0
 psycopg-pool==3.3.3

@@ -4,7 +4,7 @@
 #   index    one-off: rebuilds Qdrant from the committed chunks + embedding cache (zero API calls)
 #   api      FastAPI (migrations first), http://localhost:8000
 #   ui       Streamlit, http://localhost:8501
-# Keys come from .env (GEMINI_API_KEY, COHERE_API_KEY; see .env.example). Needs Compose 2.24+.
+# Keys come from .env (DEEPSEEK_API_KEY, GEMINI_API_KEY, COHERE_API_KEY; see .env.example). Needs Compose 2.24+.
 # Host ports can be moved, e.g. API_PORT=8100 UI_PORT=8601 docker compose up.
 # Local development (API and UI run from the venv):  docker compose up -d db qdrant
 # Docker indexes the committed embedding model only (gemini-embedding-001, 768 dims).

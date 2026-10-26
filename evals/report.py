@@ -37,7 +37,8 @@ def _table(headers: Sequence[str], rows: Sequence[Sequence[Any]]) -> str:
     return "\n".join(lines)
 
 
-def mode_summary(turns: Sequence[TurnResult]) -> dict[str, Any]:
+def mode_summary(turns: Sequence[TurnResult], primaries: frozenset[str] = frozenset()) -> dict[str, Any]:
+    """`primaries`: the roles' configured models; a turn that used any other model fell back."""
     scored = [t for t in turns if t.observed_outcome != "error"]  # outages are reported apart
     answerable = [t for t in scored if t.expected_outcome == "answer"]
     answered = [t for t in answerable if t.observed_outcome == "answer"]
@@ -56,6 +57,7 @@ def mode_summary(turns: Sequence[TurnResult]) -> dict[str, Any]:
         "faithfulness": mean([t.faithfulness for t in judged]),
         "relevancy": mean([t.relevancy for t in judged]),
         "self_judged": sum(t.self_judged for t in judged),
+        "fallback_answers": sum(bool(set(t.models) - primaries) for t in scored),
         "judge_agreement": mean(
             [agreement(t.verdicts, t.cross_check_verdicts) for t in judged if t.cross_check_verdicts]
         ),
@@ -120,7 +122,9 @@ def build_report(
 ) -> tuple[str, dict[str, Any]]:
     by_id = {item.id: item for item in items}
     modes = list(dict.fromkeys(t.mode for t in turns))
-    summaries = {mode: mode_summary([t for t in turns if t.mode == mode]) for mode in modes}
+    roles = meta.get("models", {})
+    primaries = frozenset(roles[r] for r in ("planner", "reviewer", "generator") if r in roles)
+    summaries = {mode: mode_summary([t for t in turns if t.mode == mode], primaries) for mode in modes}
     ablation = summarise(retrieval)
     out = [
         f"# Evaluation: {run_name}",
@@ -129,8 +133,8 @@ def build_report(
         "\n" + _table(["Role", "Model"], list(meta["models"].items())),
         "\n**How the golden set was built:** questions written by Claude Code from the paragraphs in "
         "`chunks.jsonl` (gold labels = those paragraphs); hard cases (comparison, cross-reference, follow-up, "
-        "out-of-scope, ambiguous) written by hand from the paragraph text. Claude writes the questions, Gemini 3.5 "
-        "Flash-Lite answers, Gemini 3.1 Flash-Lite judges. " + _review_line(meta.get("review", {})),
+        "out-of-scope, ambiguous) written by hand from the paragraph text. Claude writes the questions; the "
+        "models in the table above answer and judge. " + _review_line(meta.get("review", {})),
         "\n## How to read this",
         HOW_TO_READ,
         "\n## Retrieval ablation (first 5 passages, single-turn answerable questions)",
@@ -168,7 +172,8 @@ def build_report(
             ("Relevancy 1-5 (judge)", "relevancy", _num),
             ("Judge agreement with gemini-3.8-flash", "judge_agreement", _pct),
             ("Answers cross-checked", "cross_checked", str),
-            ("Answers judged by the generator's own model (fallback)", "self_judged", str),
+            ("Answers judged by a model that also answered them (fallback)", "self_judged", str),
+            ("Answers that used a fallback model (the primary failed)", "fallback_answers", str),
             ("LLM calls per question", "llm_calls", _num),
             ("Tokens per question", "tokens", lambda v: _num(v, 0)),
             ("Latency p50 (s)", "latency_p50", _num),

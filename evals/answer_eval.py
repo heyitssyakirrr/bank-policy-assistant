@@ -50,6 +50,7 @@ class TurnResult(BaseModel):
     verified: bool
     notes: list[str]
     llm_calls: int
+    models: list[str] = []  # every model that answered this turn, in order (fallbacks show here)
     input_tokens: int
     output_tokens: int
     latency_ms: int
@@ -60,7 +61,7 @@ class TurnResult(BaseModel):
     faithfulness: float | None = None
     relevancy: int | None = None
     judge_model: str | None = None
-    self_judged: bool = False  # the judge fell back to the generator's own model
+    self_judged: bool = False  # the judge is a model that also answered this turn
     cross_check_verdicts: list[str] = []
 
 
@@ -105,6 +106,7 @@ def score_turn(item: GoldenItem, mode: str, state: dict[str, Any], latency_ms: i
         verified=bool(verifications) and verifications[-1].passed,
         notes=notes,
         llm_calls=state.get("llm_calls", 0),
+        models=state.get("models", []),
         input_tokens=state.get("input_tokens", 0),
         output_tokens=state.get("output_tokens", 0),
         latency_ms=latency_ms,

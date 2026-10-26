@@ -27,7 +27,11 @@ def readiness(count_points: Callable[[], int], database_ok: Callable[[], bool], 
         "index_version": index_version,
         "prompt_version": PROMPT_VERSION,
         "models": {role: role_models(role)[0] for role in ("planner", "reviewer", "generator")},
-        "keys": {"gemini": bool(settings.gemini_api_key), "cohere": bool(settings.cohere_api_key)},
+        "keys": {
+            "deepseek": bool(settings.deepseek_api_key),
+            "gemini": bool(settings.gemini_api_key),
+            "cohere": bool(settings.cohere_api_key),
+        },
     }
 
 
