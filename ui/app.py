@@ -17,6 +17,7 @@ st.set_page_config(page_title="BNM Policy Assistant", page_icon=":material/polic
 pages = [
     st.Page("views/chat.py", title="Ask", icon=":material/forum:", default=True),
     st.Page("views/compare.py", title="Compare modes", icon=":material/compare_arrows:"),
+    st.Page("views/guide.py", title="Guide: what to ask", icon=":material/menu_book:"),
     st.Page("views/evaluation.py", title="Evaluation", icon=":material/analytics:"),
     st.Page("views/about.py", title="How it works", icon=":material/account_tree:"),
 ]

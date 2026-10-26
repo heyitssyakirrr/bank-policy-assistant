@@ -2,8 +2,8 @@
 history, the live step timeline, and how an answered turn looks.
 
 A turn (a TurnView dict) is drawn as: a status badge and who it applies to,
-the summary, the statements with MUST / MAY tags and citation links, the
-sources, the agent steps, the cost line and thumbs up / down.
+the "In short" summary, the statements grouped as MUST / MAY / INFO with
+citation links, the sources, the agent steps, the cost line and thumbs up / down.
 """
 
 from __future__ import annotations
@@ -37,6 +37,8 @@ OUTCOME_BADGES = {
     "small_talk": ("Hello", "gray", ":material/waving_hand:"),
 }
 OBLIGATION_TAGS = {"must": ("MUST", "red"), "should_or_may": ("MAY", "blue"), "information": ("INFO", "gray")}
+# The group titles read with their badge: "MUST obligations", "MAY options and guidance", "INFO background".
+OBLIGATION_GROUPS = {"must": "obligations", "should_or_may": "options and guidance", "information": "background"}
 PROVISION_LABELS = {"S": "Standard (S): an obligation", "G": "Guidance (G)"}
 MODE_HELP = (
     "Agentic: the model plans the searches, runs them in parallel, checks the evidence and searches again "
@@ -154,7 +156,8 @@ def stream_turn(backend: Backend, question: str, mode: str, sector: str | None, 
     """Ask, showing each agent step as it finishes (and an error, if any)."""
     started: dict[str, Any] = {}
     previous_ms = 0
-    with st.status(":shimmer[Reading the question]", type="compact", expanded=True) as status:
+    label = "Reading the question"
+    with st.status(f":shimmer[{label}]", type="compact", expanded=True) as status:
         for event in backend.chat(question, mode, sector, conversation_id):
             match event["type"]:
                 case "start":
@@ -166,7 +169,8 @@ def stream_turn(backend: Backend, question: str, mode: str, sector: str | None, 
                 case "step":
                     _step(event, event["ms"] - previous_ms)
                     previous_ms = event["ms"]
-                    status.update(label=f":shimmer[{(event['lines'] or [event['title']])[-1]}]")
+                    label = live_label(event, label)
+                    status.update(label=f":shimmer[{label}]")
                 case "answer":
                     turn = event["turn"]
                     status.update(label=_steps_label(turn), state="complete", expanded=False)
@@ -178,6 +182,21 @@ def stream_turn(backend: Backend, question: str, mode: str, sector: str | None, 
         status.update(label="Could not finish", state="error", expanded=False)
     st.error(INTERRUPTED_MESSAGE, icon=":material/error:")
     return Asked(None, started.get("conversation_id", conversation_id), INTERRUPTED_MESSAGE)
+
+
+def live_label(step: dict[str, Any], current: str) -> str:
+    """The running status line: the step's last line; a step without lines (finish) keeps the current one."""
+    return step["lines"][-1] if step["lines"] else current
+
+
+def obligation_groups(statements: list[dict[str, Any]]) -> list[tuple[str, list[dict[str, Any]]]]:
+    """Statements grouped MUST, then MAY, then INFO (empty groups left out). An
+    unknown obligation from an old stored turn goes under INFO rather than vanishing."""
+
+    def group(statement: dict[str, Any]) -> str:
+        return statement["obligation"] if statement["obligation"] in OBLIGATION_GROUPS else "information"
+
+    return [(o, items) for o in OBLIGATION_GROUPS if (items := [s for s in statements if group(s) == o])]
 
 
 def _step(step: dict[str, Any], took_ms: int) -> None:
@@ -218,21 +237,23 @@ def render_turn(turn: dict[str, Any], backend: Backend, show_steps: bool = True)
         if turn["outcome"] == "answer" and turn["statements"]:
             st.caption(f"Applies to {turn['applies_to']}")
     if turn["summary"]:
-        st.markdown(turn["summary"])
+        st.markdown(f"**In short:** {turn['summary']}" if turn["statements"] else turn["summary"])
 
-    topics = list(dict.fromkeys(s["topic"] for s in turn["statements"]))
-    grouped = 1 < len(topics) < len(turn["statements"])  # headings only when a topic has several statements
-    for topic in topics:
-        if grouped:
-            st.markdown(f"**{topic[:1].upper()}{topic[1:]}**")
-        for statement in (s for s in turn["statements"] if s["topic"] == topic):
-            tag, tag_color = OBLIGATION_TAGS[statement["obligation"]]
+    # Obligations first, then guidance, then background; a comparison names each line's side.
+    several_topics = len({s["topic"] for s in turn["statements"]}) > 1
+    for obligation, statements in obligation_groups(turn["statements"]):
+        tag, tag_color = OBLIGATION_TAGS[obligation]
+        title = OBLIGATION_GROUPS[obligation]
+        lines = []
+        for statement in statements:
             links = " · ".join(
                 f'[{sources[i]["label"]}]({backend.pdf_link(sources[i]["pdf_url"])} "{sources[i]["citation"]}")'
                 for i in statement["sources"]
                 if i in sources
             )
-            st.markdown(f":{tag_color}-badge[{tag}] {statement['text']} {links}")
+            topic = f":gray[{statement['topic']}:] " if several_topics else ""
+            lines.append(f"- {topic}{statement['text']} {links}")
+        st.markdown(f":{tag_color}-badge[{tag}] **{title.capitalize()}**\n\n" + "\n".join(lines))
     if turn.get("gaps"):
         st.caption(f"Not covered by the documents: {turn['gaps']}")
     for note in turn["notes"]:

@@ -253,6 +253,17 @@ bank-policy-assistant/
 
 ## Decisions log (why things are the way they are)
 
+**A guide to the documents, and readable answers (2026-10-26)**
+- Syakir: neither he nor an assessor knows the three PDFs, so they can't tell
+  what to ask or whether an answer is right. Added `docs/policy_guide.md` and
+  an in-app "Guide: what to ask" page (what each document covers, the terms,
+  questions with the answer a reader should expect and the paragraph to
+  check, an Ask button per question). Answers now read "In short", then
+  Obligations / Guidance and options / Background; "Guidance and options"
+  rather than "What you may do", because a MAY can be BNM's power (e.g.
+  enforcement, e-KYC App. 2 para 13). Display only: no prompt change, so the
+  evaluation stands.
+
 **DeepSeek as the main LLM (2026-10-26)**
 - Syakir paid for DeepSeek after the Gemini free tier's repeated 503s.
   Planner, reviewer and generator use `deepseek-flash` (thinking off); Gemini

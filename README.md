@@ -16,7 +16,7 @@ and measured:
 
 **Live demo:** https://bnm-policy-assistant.streamlit.app/
 
-**Docs:** [architecture](docs/architecture.md) · [agentic RAG investigation](docs/agentic_rag_investigation.md) ·
+**Docs:** [guide to the three documents](docs/policy_guide.md) · [architecture](docs/architecture.md) · [agentic RAG investigation](docs/agentic_rag_investigation.md) ·
 [testing and evaluation](docs/testing_and_evaluation.md) · [demo script](docs/demo_script.md) ·
 [design decisions Q&A](docs/design_qa.md) · [plan and milestones](PROJECT_PLAN.md) ·
 [build log](PROGRESS.md) · [deployment](docs/DEPLOY.md)

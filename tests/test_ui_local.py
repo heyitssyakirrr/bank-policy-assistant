@@ -18,6 +18,8 @@ from app.db import vector_repository
 from tests.fakes import ScriptedLLM
 from tests.test_api import ANSWER, REVIEW, Harness, plan
 from ui.backend import START_FAILED_MESSAGE
+from ui.components import live_label, obligation_groups
+from ui.guide_content import QUESTIONS
 from ui.local_backend import STORE_DOWN_MESSAGE, LocalBackend, publish_pdfs
 
 QUESTION = "Can banks use biometric technology?"
@@ -101,6 +103,7 @@ def test_the_ask_page_answers_a_question(pages):
     assert not app.exception
     shown = " ".join(m.value for m in app.markdown)
     assert ANSWER.summary in shown and ANSWER.statements[0].text in shown
+    assert "In short:" in shown and "Obligations" in shown  # obligations grouped apart from guidance
     assert any("Your conversations" in c.value for c in app.sidebar.caption)
     assert any("Answered by fake-planner + fake-reviewer + fake-generator" in c.value for c in app.caption)
 
@@ -162,7 +165,92 @@ def test_qdrant_cloud_gets_the_api_key(monkeypatch):
     assert seen["api_key"] is None  # the local container has no auth
 
 
-@pytest.mark.parametrize("page", ["evaluation.py", "about.py"])
+@pytest.mark.parametrize("page", ["evaluation.py", "about.py", "guide.py"])
 def test_the_reading_pages_render(page):
     app = AppTest.from_file(PAGES / page, default_timeout=30).run()
     assert not app.exception
+
+
+def test_a_guide_question_is_asked_on_the_ask_page(pages):
+    app = AppTest.from_file(PAGES.parent / "app.py", default_timeout=30).run()
+    app.switch_page("views/guide.py").run()
+    assert not app.exception and app.title[0].value == "Guide"
+    app.button(key="ask-e-KYC-0").click().run()
+    assert not app.exception
+    [turn] = app.session_state.turns
+    assert turn["question"] == "Who has to approve a financial institution's risk appetite for e-KYC?"
+
+
+# ---------------------------------------------------------------- the guide and the answer layout
+
+
+def test_the_guide_doc_lists_every_question_on_the_guide_page():
+    doc = (Path(__file__).resolve().parents[1] / "docs" / "policy_guide.md").read_text(encoding="utf-8")
+    missing = [q.question for s in QUESTIONS.values() for q in s.questions if q.question not in doc]
+    assert missing == []
+
+
+def test_statements_are_grouped_must_then_may_then_info():
+    statements = [
+        {"obligation": "information", "text": "i"},
+        {"obligation": "must", "text": "m"},
+        {"obligation": "should_or_may", "text": "s"},
+        {"obligation": "obsolete", "text": "o"},  # an old stored turn: shown, not dropped
+    ]
+    groups = obligation_groups(statements)
+    assert [o for o, _ in groups] == ["must", "should_or_may", "information"]
+    assert [s["text"] for s in groups[-1][1]] == ["i", "o"]
+    assert obligation_groups([{"obligation": "must", "text": "m"}]) == [("must", [{"obligation": "must", "text": "m"}])]
+
+
+def test_the_live_label_keeps_the_last_line_for_a_step_without_lines():
+    assert live_label({"lines": ["Reviewed evidence: enough"]}, "Looking up") == "Reviewed evidence: enough"
+    assert live_label({"lines": []}, "Citations verified") == "Citations verified"  # finish
+
+
+def test_an_answer_with_two_topics_names_each_lines_topic(pages):
+    turn = {
+        "turn_id": "t",
+        "outcome": "answer",
+        "status": "answered",
+        "applies_to": "banking institutions",
+        "summary": "They differ.",
+        "statements": [
+            {"obligation": "should_or_may", "text": "May use biometrics.", "topic": "e-KYC", "sources": []},
+            {"obligation": "must", "text": "Must get Board approval.", "topic": "AML/CFT", "sources": []},
+        ],
+        "sources": [],
+        "notes": [],
+        "steps": [],
+        "verified": True,
+        "mode": "agentic",
+        "models": [],
+        "llm_calls": 1,
+        "input_tokens": 1,
+        "output_tokens": 1,
+        "latency_ms": 1,
+        "disclaimer": "Not legal advice.",
+    }
+
+    def page(turn):
+        from ui.components import render_turn
+
+        render_turn(turn, backend=None)
+
+    app = AppTest.from_function(page, args=(turn,), default_timeout=30).run()
+    assert not app.exception
+    blocks = [m.value for m in app.markdown]
+    must = next(i for i, b in enumerate(blocks) if "Obligations" in b)
+    may = next(i for i, b in enumerate(blocks) if "Options and guidance" in b)
+    assert must < may and ":gray[AML/CFT:]" in blocks[must] and ":gray[e-KYC:]" in blocks[may]
+
+
+def test_guide_questions_about_the_agent_are_asked_in_agentic_mode(pages):
+    app = AppTest.from_file(PAGES.parent / "app.py", default_timeout=30).run()
+    app.session_state.mode_label = "Traditional"
+    app.chat_input[0].set_value(QUESTION).run()  # an existing conversation, in traditional mode
+    app.switch_page("views/guide.py").run()
+    app.button(key="ask-What the agent adds-1").click().run()
+    assert not app.exception
+    [turn] = app.session_state.turns  # a new conversation with just this question
+    assert turn["question"] == "What does para 8.2 say?" and turn["mode"] == "agentic"

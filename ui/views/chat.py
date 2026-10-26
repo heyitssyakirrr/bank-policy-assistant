@@ -14,6 +14,7 @@ from ui.components import (
     sector_setting,
     stream_turn,
 )
+from ui.guide_content import DOCUMENTS
 
 # Each shows something the agent does: a cross-reference, a sector, a table, a comparison.
 EXAMPLES = {
@@ -21,11 +22,6 @@ EXAMPLES = {
     "Can a takaful operator onboard customers without meeting them face to face?": "Picks the takaful rules",
     "What must a bank do if FAR exceeds 5%?": "Reads the FAR table",
     "How do the e-KYC verification rules differ from AML's non-face-to-face rules?": "Compares two documents",
-}
-DOCUMENTS = {
-    "e-KYC": "Electronic Know-Your-Customer: remote onboarding, identity verification, FAR.",
-    "Fair Treatment of Financial Consumers": "Board duties, disclosure, complaints, fair conduct.",
-    "AML/CFT/CPF and TFS": "Customer due diligence, sector rules (14A to 14D), reporting.",
 }
 
 api = backend()
@@ -93,6 +89,10 @@ if not state.turns:
             key="example",
             on_change=ask_example,
             help=" ".join(f"{q} {what}." for q, what in EXAMPLES.items()),
+        )
+        st.caption(
+            ":material/menu_book: Not sure what to ask, or how to tell a good answer? The **Guide** in the "
+            "sidebar explains the three documents and lists questions with their expected answers."
         )
         left = questions_left()
         if left is not None:
