@@ -212,7 +212,7 @@ are **append-only**: database triggers reject UPDATE, DELETE and TRUNCATE.
    number, so it cannot invent a citation. Code maps `E3` back to "e-KYC
    para 8.4 (S), p. 6".
 4. **Same engine, two modes.** Both graphs share the search, the generator
-   and the verifier, so the comparison measures only the decision-making.
+   and the verifier, so the difference comes from the decisions (and the extra passages they fetch).
 5. **Degrade, never crash.** Planner down → plain search; reviewer down →
    answer from all evidence; reranker down → fused order; embedding down →
    BM25 only; one failing search → the others still answer.

@@ -72,10 +72,14 @@ sources have IDs, the model references IDs, code owns the metadata.
 1. Each cited ID was actually retrieved. If not, the ID is dropped.
 2. Each statement still has a citation. If not, the statement is dropped.
 3. The quote appears in a cited passage.
-4. A `must` statement cites at least one S paragraph.
+4. A `must` statement doesn't cite only G (guidance) paragraphs. Unmarked appendix
+   and table rules (e.g. the FAR thresholds) can state obligations too.
 5. The status matches the content.
 6. Something valid is left. If not, the answer becomes `not_covered`
    (a refusal).
+7. No cross-reference is left out: a cited passage that depends on another
+   given passage ("as required under paragraph 8.4") is answered with it. If
+   not, one regeneration; if still incomplete, the answer is kept as it is.
 
 Checks 1, 2 and 5 are fixed silently and logged. Checks 3 and 4 trigger one
 regeneration with feedback, then a downgrade to `partially_answered`. Code

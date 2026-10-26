@@ -36,8 +36,8 @@ def use_example() -> None:
 st.title("Compare modes")
 st.caption(
     "The same question, answered both ways. Both modes share the search engine, the generator (which writes "
-    "the answer) and the verifier (which checks the citations): the only difference is whether code or the "
-    "model decides the steps."
+    "the answer) and the verifier (which checks the citations). The difference is whether code or the model "
+    "decides the steps, and the extra passages the model's decisions fetch."
 )
 st.pills("Examples", EXAMPLES, key="compare_example", on_change=use_example)
 with st.form("compare", border=False):

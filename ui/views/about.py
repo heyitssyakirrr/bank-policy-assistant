@@ -25,8 +25,8 @@ with right.container(border=True):
     )
 st.markdown(
     "Both modes share the same search engine, the generator (which writes the answer) and the verifier "
-    "(which checks the citations), so comparing them measures only the decision-making. Try it on the "
-    "**Compare modes** page."
+    "(which checks the citations), so the difference between them comes from the agent's decisions, "
+    "including the extra passages those decisions fetch. Try it on the **Compare modes** page."
 )
 
 st.subheader("The search engine")

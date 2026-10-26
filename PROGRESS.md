@@ -216,6 +216,15 @@ bank-policy-assistant/
 ---
 
 ## Known issues / open items
+- **FTFC callout boxes carry the S marker (found by the M7 docs review):** the
+  66 "Good practices" / "Poor practice" chunks inherit the provision of the
+  paragraph they illustrate (50 S, 16 G), so an example can be presented as an
+  obligation and verifier check 4 can't catch it (fact-10, faithfulness 0.43).
+  Fix after submission: give callout chunks `provision: null` in the chunker,
+  re-embed the 66 changed chunks (their header changes), re-index locally and
+  on Qdrant Cloud, commit the new snapshots, re-run the FTFC items.
+- **sector-4:** the planner narrows a money-changer question to e-KYC; prompt
+  fix after submission.
 - **For M7 (found by the M5 smoke run and review):**
   - traditional exact lookup ignores a document named in the question:
     "paragraph 9.1 of the Fair Treatment … policy" puts e-KYC 9.1 and AML
