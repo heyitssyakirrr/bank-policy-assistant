@@ -253,6 +253,18 @@ bank-policy-assistant/
 
 ## Decisions log (why things are the way they are)
 
+**Scenario questions replace the direct lookups (2026-10-26)**
+- Syakir: real users describe a situation ("a customer keeps depositing cash
+  just under RM25,000") rather than ask what a paragraph says, and the golden
+  set had almost no such questions, so its numbers said nothing about them.
+  Removed lookup-1..4 and added 12 `scenario` items (AML cash reports, STRs,
+  tipping off, failed CDD, PEPs, the Domestic List, money-changer CDD; e-KYC
+  launch and legal persons; FTFC complaints and vulnerable consumers) plus
+  scope-7 (a housing-loan LTV question, not in the documents): 49 items.
+  Each gold label was checked against the paragraph text. scenario-11 tests
+  invention: FTFC sets no complaint deadline in days. Exact paragraph lookup
+  is still exercised by the cross-reference and ambiguous items.
+
 **A guide to the documents, and readable answers (2026-10-26)**
 - Syakir: neither he nor an assessor knows the three PDFs, so they can't tell
   what to ask or whether an answer is right. Added `docs/policy_guide.md` and

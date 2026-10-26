@@ -154,8 +154,8 @@ def test_latency_ignores_cached_replays_and_errors_are_counted_apart():
 def test_report_explains_where_each_gold_paragraph_was_lost():
     items = load_golden()
     by_id = {i.id: i for i in items}
-    before = score(by_id["lookup-3"], "hybrid (RRF)", ["ftfc:9.1"])
-    after = score(by_id["lookup-3"], "+ exact lookup", ["ekyc:9.1", "amlcft:9.1", "ftfc:9.1"])
+    before = score(by_id["fact-4"], "hybrid (RRF)", ["ftfc:9.1"])
+    after = score(by_id["fact-4"], "+ exact lookup", ["ekyc:9.1", "amlcft:9.1", "ftfc:9.1"])
     report, data = build_report(
         "test",
         {
@@ -172,7 +172,7 @@ def test_report_explains_where_each_gold_paragraph_was_lost():
         {"llm_requests": {}, "embeddings": 0, "reranks": 0, "cache_hits": 0},
     )
     assert "| hybrid (RRF) | 1 | 100% | 100% | 1.00 |" in report
-    assert "lookup-3 (direct_lookup): hybrid (RRF) → + exact lookup: MRR@5 1.00 → 0.33" in report
+    assert "fact-4 (paraphrased): hybrid (RRF) → + exact lookup: MRR@5 1.00 → 0.33" in report
     assert "retrieved but not cited: ['ekyc:Appendix 2:11']" in report
     assert "expected answer, got refuse" in report
     assert "Syakir spot-checked 0 item(s)" in report and "How to read this" in report
@@ -189,15 +189,13 @@ def test_estimate_counts_follow_up_turns_and_the_judge():
 
 def test_cross_check_sample_covers_every_category():
     turns = [
-        turn(item_id=f"{c}-{i}", category=c)
-        for c in ("direct_lookup", "comparison", "cross_reference")
-        for i in range(5)
+        turn(item_id=f"{c}-{i}", category=c) for c in ("scenario", "comparison", "cross_reference") for i in range(5)
     ]
     assert [t.category for t in stratified(turns, 4)] == [
-        "direct_lookup",
+        "scenario",
         "comparison",
         "cross_reference",
-        "direct_lookup",
+        "scenario",
     ]
 
 
@@ -330,7 +328,7 @@ def test_ablation_stages_on_a_fake_search():
 
     item = GoldenItem(
         id="x",
-        category="direct_lookup",
+        category="scenario",
         question="what does para 8.4 say",
         expected_paragraphs=["ekyc:8.4"],
         expected_outcome="answer",

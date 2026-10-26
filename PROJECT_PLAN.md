@@ -714,17 +714,17 @@ bounds, we script the LLM's answers. To test **the LLM's** quality, we use the
 evaluation set below. Being able to explain this split is a strong signal in
 an interview.
 
-### 8.2 The evaluation set: `evals/golden_set.yaml` (~40 questions)
+### 8.2 The evaluation set: `evals/golden_set.yaml` (49 questions)
 
 | Category | # | Example | What it proves |
 |---|---|---|---|
-| Direct lookup | 4 | "What does para 14A.9.6 require?" | Exact retrieval |
+| Scenario (26 Oct, replaced 4 direct lookups) | 12 | "A customer deposited RM20,000 cash and withdrew RM10,000 today. Do we report it?" | A banker's situation mapped to the policy's own terms |
 | Paraphrased single fact | 10 | "Can a customer be onboarded without meeting face to face?" | Semantic retrieval |
 | Comparison / multi-part | 6 | "Compare e-KYC and AML non-FTF verification rules" | Decomposition |
 | Cross-reference | 4 | "What does 8.10 require, including the rule it refers to?" | Following references |
 | Sector-specific | 4 | "Can a takaful operator onboard remotely?" | Sector handling |
 | Follow-up (2 turns) | 4 | "…and for money changers?" | Memory and rewriting |
-| Out of scope | 6 | "Credit card interest cap?", "Write me a poem" | Refusal |
+| Out of scope | 7 | "Credit card interest cap?", "Write me a poem" | Refusal |
 | Ambiguous | 2 | "What does para 8.2 say?" | Clarification |
 
 **How it is built (autonomous build, 24 Oct):**

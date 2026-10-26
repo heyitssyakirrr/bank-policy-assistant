@@ -27,7 +27,7 @@ from app.core.config import settings
 
 GOLDEN_PATH = Path("evals/golden_set.yaml")
 Category = Literal[
-    "direct_lookup",
+    "scenario",
     "paraphrased",
     "comparison",
     "cross_reference",
