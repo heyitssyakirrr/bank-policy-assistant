@@ -259,10 +259,12 @@ bank-policy-assistant/
   an in-app "Guide: what to ask" page (what each document covers, the terms,
   questions with the answer a reader should expect and the paragraph to
   check, an Ask button per question). Answers now read "In short", then
-  Obligations / Guidance and options / Background; "Guidance and options"
-  rather than "What you may do", because a MAY can be BNM's power (e.g.
-  enforcement, e-KYC App. 2 para 13). Display only: no prompt change, so the
-  evaluation stands.
+  MUST obligations / MAY options and guidance / INFO background (the
+  headings read with their badges; not "What you may do", because a MAY can
+  be BNM's power, e.g. enforcement in e-KYC App. 2 para 13). Display only: no
+  prompt change, so the evaluation stands. Reviewed by code-reviewer: 4 major
+  + 12 minor findings, fixed (expected answers corrected against 8.28, 23.2,
+  e-KYC 5.2 and 8.22; agent-only guide questions forced to agentic mode).
 
 **DeepSeek as the main LLM (2026-10-26)**
 - Syakir paid for DeepSeek after the Gemini free tier's repeated 503s.
