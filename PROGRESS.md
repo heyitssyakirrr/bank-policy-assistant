@@ -137,6 +137,7 @@ packaging.
 | 24 Oct ~14:40 | M6 clean-clone Docker check: 1 API question (+ 0 embedding calls for indexing) | 2 | 1 | 2 |
 | **24 Oct total (window ending 15:00)** | | **69** | **34** | **39** |
 | 26 Oct ~02:20 | UI redesign visual check: 1 question, answered from the response cache | 0 | 0 | 0 |
+| 26 Oct 17:28 (Syakir) | **Full evaluation on DeepSeek** (`20261026-1728-full`): 178 `deepseek-flash` calls, judge on Gemini; 0 fallback answers; agentic p50 7.0 s / p95 18.4 s | 66 | 0 | 55 |
 | 26 Oct 17:20 | **DeepSeek smoke:** 8.10 agentic, all 4 calls on `deepseek-flash` (6,006 in / 998 out tokens, under US$0.01): planner → lookup 8.10 → review follows 8.4 → answer with 2 MUST (8.4) + 3 MAY (8.10), verified first time, **7.7 s** (Gemini run just before: 52.5 s) | 0 | 0 | 0 |
 | 26 Oct 17:15 | DeepSeek smoke attempt: 8.10 agentic; the DeepSeek key wasn't loaded, so all roles ran on the Gemini fallback (answer correct, 8.10 → 8.4) | 4 | 1 | 0 |
 | 26 Oct 16:15 | M7 re-run of the 8 paragraph-number items, traditional (`20261026-1615-only`) after the named-document fix: all answers cached | 0 | 0 | 1 |
