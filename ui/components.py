@@ -253,8 +253,10 @@ def render_turn(turn: dict[str, Any], backend: Backend, show_steps: bool = True)
                 previous_ms = step["ms"]
 
     facts = ["Citations verified"] if turn["verified"] else []
+    models = list(dict.fromkeys(m.split(":", 1)[-1] for m in turn["models"]))  # a fallback shows up here
     facts += [
         f"{turn['mode'].capitalize()} mode",
+        *([f"Answered by {' + '.join(models)}"] if models else []),
         f"{turn['llm_calls']} LLM call{'s' if turn['llm_calls'] != 1 else ''}",
         f"{turn['input_tokens'] + turn['output_tokens']:,} tokens",
         f"{turn['latency_ms'] / 1000:.1f} s",

@@ -102,6 +102,7 @@ def test_the_ask_page_answers_a_question(pages):
     shown = " ".join(m.value for m in app.markdown)
     assert ANSWER.summary in shown and ANSWER.statements[0].text in shown
     assert any("Your conversations" in c.value for c in app.sidebar.caption)
+    assert any("Answered by fake-planner + fake-reviewer + fake-generator" in c.value for c in app.caption)
 
 
 def test_an_example_question_is_asked_once(pages):
