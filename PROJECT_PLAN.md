@@ -423,7 +423,13 @@ Recorded here so the plan stays the source of truth:
 - **Sector:** `detect_sector` is gone. The caller passes the preferred sector
   (planner, else sidebar); `None` ("show all sectors") demotes nothing.
   Traditional mode keeps regex paragraph refs, limited to the searched
-  documents.
+  documents. **Changed 26 Oct (M7):** when the question names exactly one
+  document ("paragraph 9.1 of the Fair Treatment … policy"), that
+  document's exact matches are put first (`named_document_first`). It orders
+  and never filters, so a name used as a topic ("14A.9.6 … about e-KYC")
+  can't lose a match. Why: M7's lookup-3 fell from MRR@5 1.00 to 0.33 at the
+  "+ exact lookup" stage, because e-KYC 9.1 and AML 9.1 came before FTFC 9.1.
+  The M7 ablation's "+ exact lookup" figures predate this fix.
 - **Evidence across searches:** the evidence reducer also drops another
   sector's copy of a rule already found by a different search (lookups are
   always kept).

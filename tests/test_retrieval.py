@@ -6,10 +6,17 @@ import math
 import pytest
 from qdrant_client import QdrantClient
 
-from app.db.vector_repository import VectorRepository
+from app.db.vector_repository import SearchHit, VectorRepository
 from app.ingestion.indexer import EmbeddingCache, index_chunks
 from app.services.embedding_service import build_request
-from app.services.retrieval_service import ParagraphLookup, RetrievalService, find_paragraph_refs, rrf_fuse
+from app.services.retrieval_service import (
+    ParagraphLookup,
+    RetrievalService,
+    find_paragraph_refs,
+    named_document,
+    named_document_first,
+    rrf_fuse,
+)
 from tests.test_indexing import DIM, CountingEmbedder, fake_embed
 from tests.test_ingestion import APPENDIX, MAIN_BODY, chunks_for
 
@@ -56,6 +63,38 @@ def test_find_paragraph_refs(question, expected):
     assert find_paragraph_refs(question) == expected
 
 
+@pytest.mark.parametrize(
+    ("question", "document"),
+    [
+        ("What does paragraph 9.1 of the Fair Treatment of Financial Consumers policy require?", "ftfc"),
+        ("What does e-KYC paragraph 8.21 say?", "ekyc"),
+        ("What does paragraph 14A.9.6 of the AML/CFT policy document require?", "amlcft"),
+        ("Electronic Know-Your-Customer paragraph 8.4", "ekyc"),
+        ("e KYC paragraph 8.4", "ekyc"),
+        ("anti money laundering paragraph 14A.9.6", "amlcft"),
+        ("Fair-treatment paragraph 9.1", "ftfc"),
+        ("What does paragraph 14A.9.6 say about e-KYC onboarding?", "ekyc"),  # a topic: only orders, see below
+        ("What does para 8.2 say?", None),  # no document named
+        ("Compare e-KYC 8.2 with FTFC 8.2", None),  # two named: don't guess
+        ("What does KYC paragraph 8.4 say?", None),  # plain KYC is a practice, not the e-KYC document
+        ("What does paragraph 13 require?", None),
+    ],
+)
+def test_the_document_a_question_names(question, document):
+    assert named_document(question) == document
+
+
+def hit(doc_code, paragraph_id):
+    return SearchHit(id=f"{doc_code}:{paragraph_id}", score=0.0, payload={"doc_code": doc_code})
+
+
+def test_the_named_documents_matches_come_first_and_none_are_lost():
+    hits = [hit("ekyc", "9.1"), hit("amlcft", "9.1"), hit("ftfc", "9.1")]
+    assert [h.id for h in named_document_first(hits, "ftfc")] == ["ftfc:9.1", "ekyc:9.1", "amlcft:9.1"]
+    assert named_document_first(hits, None) == hits
+    assert named_document_first(hits, "nowhere") == hits  # a wrong guess changes nothing
+
+
 # ---------------------------------------------------------------- the service on real-shaped chunks
 
 
@@ -72,6 +111,13 @@ def test_exact_paragraph_is_returned_first(service):
     top = result.chunks[0]
     assert top.exact_match and top.payload["paragraph_id"] == "8.10"
     assert result.paragraph_refs == [ParagraphLookup(None, "8.10")]
+
+
+def test_a_document_named_as_a_topic_never_loses_the_exact_match(service):
+    # Only e-KYC is indexed here: "of the FTFC policy" must not hide e-KYC 8.10.
+    result = service.retrieve("What does paragraph 8.10 of the FTFC policy say?")
+    top = result.chunks[0]
+    assert top.exact_match and top.payload["doc_code"] == "ekyc" and top.payload["paragraph_id"] == "8.10"
 
 
 def test_paragraph_lookup_respects_the_document(service):

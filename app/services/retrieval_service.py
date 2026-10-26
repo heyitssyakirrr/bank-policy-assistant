@@ -25,8 +25,9 @@ metadata and put it first. Real systems call this query routing.
 
 Paragraph numbers repeat across documents ("8.2" is in all three), so a
 reference carries its document when it is known: the agent's planner
-supplies `(document, paragraph_id)` pairs; the traditional mode finds bare
-numbers in the question with a regex, limited to the documents searched.
+supplies `(document, paragraph_id)` pairs; the traditional mode finds the
+numbers in the question with a regex, looks them up in all the documents
+searched, and puts the matches in the document the question names first.
 """
 
 from __future__ import annotations
@@ -86,6 +87,29 @@ def find_paragraph_refs(question: str) -> list[str]:
     return list(dict.fromkeys(ref.upper() for ref in PARAGRAPH_REF_RE.findall(question)))
 
 
+# How users name the three documents. Only used to ORDER the exact matches of a
+# paragraph number typed in the question ("paragraph 9.1 of the Fair Treatment …
+# policy": FTFC 9.1 before e-KYC 9.1 and AML 9.1). Never a filter: a name used as a
+# topic ("14A.9.6 … about e-KYC onboarding") then only changes the order, and no
+# match is lost. Understanding the question stays the planner's job.
+DOCUMENT_NAME_RES = {
+    "ekyc": re.compile(r"\be[- ]?kyc\b|electronic (?:kyc|know[- ]your[- ]customer)", re.IGNORECASE),
+    "ftfc": re.compile(r"\bftfc\b|fair[- ]treatment", re.IGNORECASE),
+    "amlcft": re.compile(r"\bamla?\b|anti[- ]money laundering|\bcft\b|\btfs\b", re.IGNORECASE),
+}
+
+
+def named_document(question: str) -> str | None:
+    """The one document the question names, or None (none or several named)."""
+    named = [code for code, pattern in DOCUMENT_NAME_RES.items() if pattern.search(question)]
+    return named[0] if len(named) == 1 else None
+
+
+def named_document_first(hits: Sequence[SearchHit], document: str | None) -> list[SearchHit]:
+    """The exact matches with the named document's first (a stable sort: the rest keep their order)."""
+    return sorted(hits, key=lambda hit: hit.payload.get("doc_code") != document) if document else list(hits)
+
+
 def rrf_fuse(ranked_lists: Sequence[Sequence[str]], k: int = 60) -> list[tuple[str, float]]:
     """Reciprocal Rank Fusion over lists of ids (best first).
 
@@ -127,12 +151,12 @@ class RetrievalService:
         timings: dict[str, float] = {}
 
         # 1. Exact paragraph lookup (cheap metadata filter, no ranking involved).
-        refs = (
-            [ParagraphLookup(None, ref) for ref in find_paragraph_refs(question)]
-            if paragraph_refs is None
-            else list(paragraph_refs)
-        )
-        exact = self.lookup(refs, documents, exclude_tags)
+        if paragraph_refs is None:  # the numbers typed in the question, the named document's first
+            refs = [ParagraphLookup(None, ref) for ref in find_paragraph_refs(question)]
+            exact = named_document_first(self.lookup(refs, documents, exclude_tags), named_document(question))
+        else:
+            refs = list(paragraph_refs)
+            exact = self.lookup(refs, documents, exclude_tags)
 
         # 2. Encode the question both ways. Dense needs a Gemini call; BM25 is local.
         started = time.perf_counter()

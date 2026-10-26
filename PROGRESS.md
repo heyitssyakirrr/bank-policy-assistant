@@ -9,7 +9,7 @@
 **Current step:** deployment (Syakir: accounts, index upload, push,
 docs/DEPLOY.md) and M7, the first full evaluation (Syakir runs it after the
 3 pm quota reset)
-**Tests:** 321 passing
+**Tests:** 335 passing
 **Repo:** _(add your GitHub link)_
 
 ---
@@ -137,6 +137,8 @@ packaging.
 | 24 Oct ~14:40 | M6 clean-clone Docker check: 1 API question (+ 0 embedding calls for indexing) | 2 | 1 | 2 |
 | **24 Oct total (window ending 15:00)** | | **69** | **34** | **39** |
 | 26 Oct ~02:20 | UI redesign visual check: 1 question, answered from the response cache | 0 | 0 | 0 |
+| 26 Oct 16:15 | M7 re-run of the 8 paragraph-number items, traditional (`20261026-1615-only`) after the named-document fix: all answers cached | 0 | 0 | 1 |
+| 26 Oct 03:38 (Syakir) | **M7 full evaluation** (`20261026-0338-full`): 40 items × 2 modes, judged; cross-check stopped after 3 (gemini-3.8-flash 504s) | 185 | 89 | 68 |
 | 26 Oct (Syakir) | Live Streamlit Cloud check: 8.10, onboarding + takaful follow-up, NRIC, credit-card Compare, 8.10 again (cached); calls estimated from the answers' LLM-call counts | ~11 | ~5 | ~4 |
 
 ---
@@ -160,6 +162,7 @@ packaging.
 | M3 API: "Can a bank onboard customer 900101-14-5678 without meeting face to face?" then "what about money changers?" (same conversation_id) | NRIC masked in prompts, logs and `turns`; turn 2 rewritten from the Postgres checkpoint, sector → money services, cites the AML 14C copies (14C.16.1, 14C.16.10-12); 31 s (one 504 retry) and 9 s; 2 `turns` + 13 `turn_events` rows; UPDATE and TRUNCATE on the audit tables rejected |
 | M4 UI Compare: "What does e-KYC paragraph 8.10 require?" | traditional 7.2 s, 1 LLM call: only 8.10 (MAY). Agentic 40.6 s, 5 LLM calls: followed 8.10 → 8.4, regenerated once (check 7), answered MUST from 8.4 (S) + MAY from 8.10 (G). Screenshot: docs/screenshots/compare.png |
 | Generator thinking trial (8.10) | low: ignored the fetched 8.4 even with an explicit prompt rule; medium: used it (4.3 s generator) |
+| **M7 full evaluation (20261026-0338-full)** | 40 items × 2 modes, 0 errors. Agentic vs traditional: outcome 100% vs 95% (traditional can't ask to clarify: 0/2), citation recall 91% vs 80%, evidence recall 92% vs 82%, faithfulness 99% vs 98%, relevancy 5.00 vs 4.84, 2.85 vs 1.05 LLM calls, p50 25.1 s vs 4.4 s (p95 69.9 vs 11.0). Agentic wins most on cross-reference (citation recall 100% vs 62%), comparison (83% vs 56%) and follow-up (100% vs 75%); traditional is better on sector items (100% vs 75%: sector-4, the planner filtered a money-changer question to e-KYC and missed AML 14C.16.12). Ablation (28 items): Hit@5 dense 93% / BM25 86% / hybrid 96%; MRR@5 dense 0.86, hybrid 0.85, + exact lookup 0.82 (lookup-3: the document named in the question is ignored), + rerank 0.86, Recall@5 81% → 84%. 4 answers judged by the generator's model during 503s (disclosed). |
 | M5 smoke (20261024-1457-smoke) | agentic: outcome 100%, citation recall 83%, relevancy 5.0; traditional: outcome 80% (answered the ambiguous "para 8.2" instead of asking), citation recall 50% (missed 8.4 for xref-1 and 14B.17.1 for the follow-up). Faithfulness 100% both. Ablation (8 items): hybrid MRR@5 0.94 vs dense 0.75 / BM25 0.74; rerank lifts Recall@5 78% → 88% |
 | M6 Docker (clean-clone copy, own ports and volumes) | index bootstrap: 0 Gemini calls, 1,219 points from the committed cache; API healthy; one agentic question answered and verified (3 LLM calls, 24.6 s); UI page 200 |
 | Gemini latency | planner 11 s with default thinking → 3 s with `thinking_level=low`. gemini-3.1-flash-lite returned 504 DEADLINE_EXCEEDED on ~1 in 8 calls (retried); a stalled call cost up to 30 s, now 20 s |
@@ -237,6 +240,15 @@ bank-policy-assistant/
 ---
 
 ## Decisions log (why things are the way they are)
+
+**M7 fix: the document named in the question (2026-10-26)**
+- lookup-3: "paragraph 9.1 of the Fair Treatment … policy" put e-KYC 9.1 and
+  AML 9.1 above FTFC 9.1. The traditional mode now orders the exact matches
+  so the named document's come first (PROJECT_PLAN §5.7 "Sector"). The first
+  version filtered by the name; code-reviewer showed a name used as a topic
+  would then lose the match, so it only orders. sector-4 (the planner
+  filtering a money-changer question to e-KYC) is left as a known limit:
+  a prompt change on submission day was judged too risky.
 
 **Model cooldown (2026-10-26)**
 - From Syakir's live logs: gemini-3.1-flash-lite answered 503 "high demand"

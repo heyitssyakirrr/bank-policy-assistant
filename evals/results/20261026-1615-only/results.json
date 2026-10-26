@@ -1,0 +1,2090 @@
+{
+ "run": "20261026-1615-only",
+ "meta": {
+  "date": "2026-10-26 16:15",
+  "commit": "c565c5d",
+  "prompt_version": "2026-10-24.8",
+  "golden_size": 40,
+  "models": {
+   "planner": "google_genai:gemini-3.1-flash-lite",
+   "reviewer": "google_genai:gemini-3.1-flash-lite",
+   "generator": "google_genai:gemini-3.5-flash-lite",
+   "judge": "google_genai:gemini-3.1-flash-lite",
+   "judge cross-check": "google_genai:gemini-3.8-flash"
+  },
+  "review": {
+   "claude_code": [
+    "lookup-1",
+    "lookup-2",
+    "lookup-3",
+    "lookup-4",
+    "fact-1",
+    "fact-2",
+    "fact-3",
+    "fact-4",
+    "fact-5",
+    "fact-6",
+    "fact-7",
+    "fact-8",
+    "fact-9",
+    "fact-10",
+    "compare-1",
+    "compare-2",
+    "compare-3",
+    "compare-4",
+    "compare-5",
+    "compare-6",
+    "xref-1",
+    "xref-2",
+    "xref-3",
+    "xref-4",
+    "sector-1",
+    "sector-2",
+    "sector-3",
+    "sector-4",
+    "followup-1",
+    "followup-2",
+    "followup-3",
+    "followup-4"
+   ],
+   "syakir": []
+  }
+ },
+ "usage": {
+  "llm_requests": {},
+  "embeddings": 0,
+  "reranks": 1,
+  "cache_hits": 72
+ },
+ "retrieval_ablation": [
+  {
+   "stage": "dense only",
+   "n": 8,
+   "hit@5": 0.875,
+   "recall@5": 0.75,
+   "mrr@5": 0.875
+  },
+  {
+   "stage": "BM25 only",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.8125,
+   "mrr@5": 1.0
+  },
+  {
+   "stage": "hybrid (RRF)",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.8125,
+   "mrr@5": 1.0
+  },
+  {
+   "stage": "+ exact lookup",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.8125,
+   "mrr@5": 1.0
+  },
+  {
+   "stage": "+ rerank",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.8125,
+   "mrr@5": 1.0
+  },
+  {
+   "stage": "+ selection",
+   "n": 8,
+   "hit@5": 1.0,
+   "recall@5": 0.8125,
+   "mrr@5": 1.0
+  }
+ ],
+ "retrieval_errors": [],
+ "answers_by_mode": {
+  "traditional": {
+   "n": 8,
+   "errors": 0,
+   "outcome_accuracy": 1.0,
+   "answer_rate": 1.0,
+   "refusal_accuracy": null,
+   "clarify_accuracy": null,
+   "citation_recall": 0.8125,
+   "evidence_recall": 0.8125,
+   "verified": 1.0,
+   "faithfulness": 1.0,
+   "relevancy": 5.0,
+   "self_judged": 0,
+   "judge_agreement": null,
+   "cross_checked": 0,
+   "llm_calls": 1.125,
+   "tokens": 3188.75,
+   "latency_p50": null,
+   "latency_p95": null,
+   "latency_n": 0
+  }
+ },
+ "retrieval": [
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "dense only",
+   "ranked": [
+    "amlcft:14A.9.16",
+    "amlcft:14A.15.6",
+    "amlcft:14A.9.25",
+    "amlcft:14A.15.9",
+    "amlcft:14A.2"
+   ],
+   "hit": 0.0,
+   "recall": 0.0,
+   "mrr": 0.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "BM25 only",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:8.1",
+    "amlcft:14A.9.7",
+    "amlcft:10.2.5",
+    "ekyc:8.13"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:14A.9.16",
+    "amlcft:14A.15.6",
+    "amlcft:8.1",
+    "amlcft:14A.9.7"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:14A.9.16",
+    "amlcft:14A.15.6",
+    "amlcft:8.1",
+    "amlcft:14A.9.7"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "+ rerank",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:14A.9.7",
+    "ekyc:8.13",
+    "amlcft:14A.9.5",
+    "amlcft:14A.9.9"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "stage": "+ selection",
+   "ranked": [
+    "amlcft:14A.9.6",
+    "amlcft:14A.9.7",
+    "ekyc:8.13",
+    "amlcft:14A.9.5",
+    "amlcft:14A.9.9"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-2",
+   "category": "direct_lookup",
+   "stage": "dense only",
+   "ranked": [
+    "ekyc:8.21",
+    "ekyc:8.5",
+    "ekyc:8.26",
+    "ekyc:8.28",
+    "ekyc:8.1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-2",
+   "category": "direct_lookup",
+   "stage": "BM25 only",
+   "ranked": [
+    "ekyc:8.21",
+    "ekyc:8.27",
+    "ekyc:8.26",
+    "ekyc:Appendix 4:10",
+    "ekyc:8.24"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-2",
+   "category": "direct_lookup",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ekyc:8.21",
+    "ekyc:8.26",
+    "ekyc:8.5",
+    "ekyc:8.27",
+    "ekyc:8.12"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-2",
+   "category": "direct_lookup",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ekyc:8.21",
+    "ekyc:8.26",
+    "ekyc:8.5",
+    "ekyc:8.27",
+    "ekyc:8.12"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-2",
+   "category": "direct_lookup",
+   "stage": "+ rerank",
+   "ranked": [
+    "ekyc:8.21",
+    "ekyc:8.26",
+    "ekyc:8.27",
+    "ekyc:8.22",
+    "ekyc:8.20"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-2",
+   "category": "direct_lookup",
+   "stage": "+ selection",
+   "ranked": [
+    "ekyc:8.21",
+    "ekyc:8.26",
+    "ekyc:8.27",
+    "ekyc:8.22",
+    "ekyc:8.20"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "dense only",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.4",
+    "ftfc:9.2",
+    "ftfc:8.1",
+    "ftfc:Appendix 1:-"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "BM25 only",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:Appendix 4:2",
+    "ftfc:15.1",
+    "ftfc:Appendix 4:1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "ftfc:9.4",
+    "ftfc:15.1",
+    "ftfc:8.2"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ftfc:9.1",
+    "ekyc:9.1",
+    "amlcft:9.1",
+    "ftfc:9.2",
+    "ftfc:9.4"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "+ rerank",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "amlcft:9.1",
+    "ftfc:Appendix 1:-",
+    "ftfc:9.4"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "stage": "+ selection",
+   "ranked": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "amlcft:9.1",
+    "ftfc:Appendix 1:-",
+    "ekyc:9.1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-4",
+   "category": "direct_lookup",
+   "stage": "dense only",
+   "ranked": [
+    "amlcft:24.3",
+    "amlcft:24.1",
+    "amlcft:24.2",
+    "amlcft:24.6",
+    "amlcft:Appendix 4a:24"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-4",
+   "category": "direct_lookup",
+   "stage": "BM25 only",
+   "ranked": [
+    "amlcft:24.3",
+    "amlcft:8.1",
+    "amlcft:10.2.5",
+    "amlcft:22.2.5",
+    "amlcft:8.3"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-4",
+   "category": "direct_lookup",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "amlcft:24.3",
+    "amlcft:3.5",
+    "amlcft:24.6",
+    "amlcft:14D.4",
+    "amlcft:20.1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-4",
+   "category": "direct_lookup",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "amlcft:24.3",
+    "amlcft:3.5",
+    "amlcft:24.6",
+    "amlcft:14D.4",
+    "amlcft:20.1"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-4",
+   "category": "direct_lookup",
+   "stage": "+ rerank",
+   "ranked": [
+    "amlcft:24.3",
+    "amlcft:Appendix 4a:24",
+    "amlcft:Appendix 4a:24",
+    "amlcft:24.1",
+    "amlcft:24.2"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "lookup-4",
+   "category": "direct_lookup",
+   "stage": "+ selection",
+   "ranked": [
+    "amlcft:24.3",
+    "amlcft:Appendix 4a:24",
+    "amlcft:Appendix 4a:24",
+    "amlcft:24.1",
+    "amlcft:24.2"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "dense only",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.13",
+    "ekyc:8.28",
+    "ekyc:8.11"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "BM25 only",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.11",
+    "ekyc:8.22",
+    "ekyc:8.12",
+    "ekyc:8.9"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.11",
+    "ekyc:8.1",
+    "ekyc:8.16"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.11",
+    "ekyc:8.1",
+    "ekyc:8.16"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "+ rerank",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.22",
+    "ekyc:8.11",
+    "ekyc:8.12"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "stage": "+ selection",
+   "ranked": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.22",
+    "ekyc:8.12",
+    "ekyc:8.16"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-2",
+   "category": "cross_reference",
+   "stage": "dense only",
+   "ranked": [
+    "ekyc:8.5",
+    "ekyc:8.4",
+    "ekyc:8.33",
+    "ekyc:8.1",
+    "ekyc:8.9"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-2",
+   "category": "cross_reference",
+   "stage": "BM25 only",
+   "ranked": [
+    "ekyc:8.5",
+    "ekyc:8.4",
+    "ekyc:8.6",
+    "ekyc:8.10",
+    "ekyc:Appendix 4:10"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-2",
+   "category": "cross_reference",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ekyc:8.5",
+    "ekyc:8.4",
+    "ekyc:8.24",
+    "ekyc:8.6",
+    "ekyc:8.25"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-2",
+   "category": "cross_reference",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ekyc:8.5",
+    "ekyc:8.4",
+    "ekyc:8.24",
+    "ekyc:8.6",
+    "ekyc:8.25"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-2",
+   "category": "cross_reference",
+   "stage": "+ rerank",
+   "ranked": [
+    "ekyc:8.5",
+    "ekyc:8.4",
+    "ekyc:8.6",
+    "ekyc:8.10",
+    "ekyc:8.15"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-2",
+   "category": "cross_reference",
+   "stage": "+ selection",
+   "ranked": [
+    "ekyc:8.5",
+    "ekyc:8.4",
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.7"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-3",
+   "category": "cross_reference",
+   "stage": "dense only",
+   "ranked": [
+    "ekyc:8.16",
+    "ekyc:8.13",
+    "ekyc:8.9",
+    "ekyc:8.29",
+    "ekyc:8.28"
+   ],
+   "hit": 1.0,
+   "recall": 1.0,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-3",
+   "category": "cross_reference",
+   "stage": "BM25 only",
+   "ranked": [
+    "ekyc:8.16",
+    "ekyc:8.1",
+    "ekyc:8.17",
+    "ekyc:8.24",
+    "ekyc:5.2"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-3",
+   "category": "cross_reference",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "ekyc:8.16",
+    "ekyc:8.1",
+    "ekyc:8.12",
+    "ekyc:8.24",
+    "ekyc:8.5"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-3",
+   "category": "cross_reference",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "ekyc:8.16",
+    "ekyc:8.1",
+    "ekyc:8.12",
+    "ekyc:8.24",
+    "ekyc:8.5"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-3",
+   "category": "cross_reference",
+   "stage": "+ rerank",
+   "ranked": [
+    "ekyc:8.16",
+    "ekyc:8.17",
+    "ekyc:5.2",
+    "amlcft:14C.16.8",
+    "ekyc:8.15"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-3",
+   "category": "cross_reference",
+   "stage": "+ selection",
+   "ranked": [
+    "ekyc:8.16",
+    "ekyc:8.17",
+    "ekyc:5.2",
+    "ekyc:8.9",
+    "ekyc:8.4"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-4",
+   "category": "cross_reference",
+   "stage": "dense only",
+   "ranked": [
+    "amlcft:14A.15.9",
+    "amlcft:14A.2",
+    "amlcft:14A.9.25",
+    "amlcft:14A.15.3",
+    "amlcft:14A.15.4"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-4",
+   "category": "cross_reference",
+   "stage": "BM25 only",
+   "ranked": [
+    "amlcft:14A.15.9",
+    "ekyc:Appendix 4:6",
+    "amlcft:8.1",
+    "amlcft:10.2.5",
+    "amlcft:22.2.5"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-4",
+   "category": "cross_reference",
+   "stage": "hybrid (RRF)",
+   "ranked": [
+    "amlcft:14A.15.9",
+    "ekyc:Appendix 4:6",
+    "amlcft:14A.2",
+    "amlcft:14A.9.25",
+    "amlcft:8.1"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-4",
+   "category": "cross_reference",
+   "stage": "+ exact lookup",
+   "ranked": [
+    "amlcft:14A.15.9",
+    "ekyc:Appendix 4:6",
+    "amlcft:14A.2",
+    "amlcft:14A.9.25",
+    "amlcft:8.1"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-4",
+   "category": "cross_reference",
+   "stage": "+ rerank",
+   "ranked": [
+    "amlcft:14A.15.9",
+    "ekyc:Appendix 3:1",
+    "amlcft:14A.15.8",
+    "amlcft:14A.15.2",
+    "amlcft:14A.9.16"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  },
+  {
+   "item_id": "xref-4",
+   "category": "cross_reference",
+   "stage": "+ selection",
+   "ranked": [
+    "amlcft:14A.15.9",
+    "ekyc:Appendix 3:1",
+    "amlcft:14A.15.8",
+    "amlcft:14A.15.2",
+    "amlcft:14A.9.16"
+   ],
+   "hit": 1.0,
+   "recall": 0.5,
+   "mrr": 1.0
+  }
+ ],
+ "turns": [
+  {
+   "item_id": "lookup-1",
+   "category": "direct_lookup",
+   "mode": "traditional",
+   "conversation": "User: What does paragraph 14A.9.6 of the AML/CFT policy document require?",
+   "standalone_question": "What does paragraph 14A.9.6 of the AML/CFT policy document require?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 14A.9.6 requires reporting institutions to identify and verify beneficial owners through cascading steps, starting with controlling ownership, followed by control through other means, and finally senior management.",
+    "statements": [
+     {
+      "text": "Reporting institutions must identify and take reasonable measures to verify the identity of beneficial owners using specific cascading steps.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "identify and take reasonable measures to verify the identity of beneficial owners according to the following cascading steps",
+      "topic": "beneficial owner verification"
+     },
+     {
+      "text": "Reporting institutions must first identify natural persons with a controlling ownership interest, which at a minimum includes directors, partners, or shareholders with equity interest exceeding twenty-five percent.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "At a minimum, this includes identifying the directors/ shareholders with equity interest of more than twenty-five percent/partners",
+      "topic": "controlling ownership interest"
+     },
+     {
+      "text": "If there is doubt or no natural person exerts control through ownership, reporting institutions must identify natural persons exercising control through other means.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "natural person (if any) exercising control of the legal person through other means",
+      "topic": "control through other means"
+     },
+     {
+      "text": "If no natural person is identified through the first two steps, reporting institutions must identify the natural person holding the Senior Management position.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "the identity of the relevant natural person who holds the position of Senior Management",
+      "topic": "senior management"
+     },
+     {
+      "text": "Reporting institutions are not required to pursue subsequent cascading steps once beneficial owners are successfully identified in an earlier step.",
+      "obligation": "information",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "reporting institutions are not required to pursue steps (b) and (c) in circumstances where beneficial owner(s) have been identified through step (a)",
+      "topic": "cascading steps exemption"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "3b59c09f-93d1-52df-a80b-bc7dfb3832eb",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14A.9.6",
+     "provision": "S",
+     "sector": "banking",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14A.9.6 (S), p. 35",
+     "text": "14A.9.6 Reporting institutions are required to identify and take reasonable measures to verify the identity of beneficial owners according to the following cascading steps:\n(a) the identity of the natural person(s) (if any) who ultimately has a controlling ownership interest in a legal person. At a minimum, this includes identifying the directors/ shareholders with equity interest of more than twenty-five percent/partners;\n(b) to the extent that there is doubt as to whether the person(s) with the controlling ownership interest is the beneficial owner(s) referred to in paragraph 14A.9.6(a) or where no natural person(s) exert control through ownership interests, the identity of the natural person (if any) exercising control of the legal person through other means; and\n(c) where no natural person is identified under paragraphs 14A.9.6(a) or (b), the identity of the relevant natural person who holds the position of Senior Management.\nFor the avoidance of doubt, reporting institutions are not required to pursue steps (b) and (c) in circumstances where beneficial owner(s) have been identified through step (a). Similarly, where beneficial owner(s) have been identified at step (b), reporting institutions are not required to pursue step (c).",
+     "page": 38,
+     "source": "search",
+     "query": "What does paragraph 14A.9.6 of the AML/CFT policy document require?",
+     "rerank_score": 0.98490417,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "54503dfd-4916-51e9-a9af-30c7bf2c6d40",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14A.9.7",
+     "provision": "S",
+     "sector": "banking",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14A.9.7 (S), p. 36",
+     "text": "S 14A.9.7 Where there is any doubt as to the identity of persons referred to under paragraphs 14A.9.4, 14A.9.5 and 14A.9.6, the reporting institution shall:\n(a) conduct a basic search or enquiry on the background of such person to ensure that the person has not been or is not in the process of being dissolved or liquidated, or is a bankrupt; and\n(b) verify the authenticity of the information provided by such person with the Companies Commission of Malaysia, Labuan Financial Services Authority or any other relevant authority.",
+     "page": 39,
+     "source": "search",
+     "query": "What does paragraph 14A.9.6 of the AML/CFT policy document require?",
+     "rerank_score": 0.941245,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "2de0ed1a-cc22-55da-b0e1-9aae34a6f679",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.13",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.13 (S), p. 8",
+     "text": "S 8.13 When implementing e-KYC for legal persons, a financial institution shall have due regard to the areas listed as CDD requirements for legal persons in the AML/CFT/CPF and TFS for FIs Policy Document. This includes but are not limited to:\n(i) identification and verification of a legal person as an entity to establish the existence of a legitimate business.\n(ii) identification and verification of the authorised person appointed by the legal person to establish business relations and conduct transactions on behalf of the legal person; and\n(iii) identification and reasonable measures for verification of beneficial owners 7 of the legal person.\n[7] As required under paragraphs 14A.9.6, 14B.11.12, 14C.10.7 and 14D.9.6 of the AML/CFT/CPF and TFS for FIs policy document.",
+     "page": 10,
+     "source": "search",
+     "query": "What does paragraph 14A.9.6 of the AML/CFT policy document require?",
+     "rerank_score": 0.92464685,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "eb87d139-a7ae-59c4-a502-473e2e9bd0d2",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14A.9.5",
+     "provision": "S",
+     "sector": "banking",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14A.9.5 (S), p. 35",
+     "text": "14A.9.5 Reporting institutions are required to identify and verify the person authorised to represent the company or business in writing either by means of a letter of authority or directors' resolution when dealing with such person.",
+     "page": 38,
+     "source": "search",
+     "query": "What does paragraph 14A.9.6 of the AML/CFT policy document require?",
+     "rerank_score": 0.88267076,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "01eed1d1-5304-5495-b78c-59eb14b06f00",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14A.9.9",
+     "provision": "S",
+     "sector": "banking",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14A.9.9 (S), p. 36",
+     "text": "14A.9.9 Notwithstanding the above, reporting institutions are required to identify and maintain the information relating to the identity of the directors and shareholders of legal persons referred to in paragraph 14A.9.8(a) to (h), through a public register, other reliable sources or based on information provided by the customer.",
+     "page": 39,
+     "source": "search",
+     "query": "What does paragraph 14A.9.6 of the AML/CFT policy document require?",
+     "rerank_score": 0.8736898,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "amlcft:14A.9.6"
+   ],
+   "evidence_keys": [
+    "amlcft:14A.9.6",
+    "amlcft:14A.9.7",
+    "ekyc:8.13",
+    "amlcft:14A.9.5",
+    "amlcft:14A.9.9"
+   ],
+   "citation_recall": 1.0,
+   "evidence_recall": 1.0,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1596,
+   "output_tokens": 2402,
+   "latency_ms": 91,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes",
+    "yes",
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "lookup-2",
+   "category": "direct_lookup",
+   "mode": "traditional",
+   "conversation": "User: What does e-KYC paragraph 8.21 say?",
+   "standalone_question": "What does e-KYC paragraph 8.21 say?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 8.21 requires financial institutions to minimize False Acceptance Rates to ensure accuracy, and cross-references paragraph 8.20 regarding automated e-KYC solution accuracy.",
+    "statements": [
+     {
+      "text": "A financial institution must take steps to minimise the False Acceptance Rates to ensure the accuracy of the e-KYC solution.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "shall take steps to minimise the False Acceptance Rates",
+      "topic": "accuracy"
+     },
+     {
+      "text": "A financial institution must observe the considerations and requirements listed in Appendix 2 when measuring and assessing the False Acceptance Rate.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "shall observe the considerations and requirements listed in Appendix 2",
+      "topic": "assessment"
+     },
+     {
+      "text": "A financial institution must ensure that the e-KYC solution is continuously capable of accurately distinguishing between genuine and non-genuine cases of customer onboarding when the verification decision is automated.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E5"
+      ],
+      "quote": "shall ensure that the e-KYC solution is continuously capable of accurately distinguishing between genuine and non-genuine cases of customer onboarding",
+      "topic": "automated verification"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "e31f1f30-353e-5199-91e4-6dd9a5c1f82e",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.21",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.21 (S), p. 10",
+     "text": "S 8.21 For the purposes of paragraph 8.20, in ensuring accuracy of the e-KYC solution, a financial institution shall take steps to minimise the False Acceptance Rates (FAR), defined as \ud835\udc39\ud835\udc4e\ud835\udc59\ud835\udc60\ud835\udc52 \ud835\udc43\ud835\udc5c\ud835\udc60\ud835\udc56\ud835\udc61\ud835\udc56\ud835\udc63\ud835\udc52 (\ud835\udc39\ud835\udc4e\ud835\udc59\ud835\udc60\ud835\udc52 \ud835\udc43\ud835\udc5c\ud835\udc60\ud835\udc56\ud835\udc61\ud835\udc56\ud835\udc63\ud835\udc52 + \ud835\udc47\ud835\udc5f\ud835\udc62\ud835\udc52 \ud835\udc41\ud835\udc52\ud835\udc54\ud835\udc4e\ud835\udc61\ud835\udc56\ud835\udc63\ud835\udc52) \ud835\udc65 100 . In measuring and assessing the FAR, a financial institution shall observe the considerations and requirements listed in Appendix 2 8 .\n[8] For avoidance of doubt, requirements for FAR within this policy document do not apply to e-KYC solutions where verification of customer identity is automated without the use of artificial intelligence, machine learning or other similar forms of predictive algorithms.",
+     "page": 12,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.21 say?",
+     "rerank_score": 0.97994584,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "fb03103a-1354-5f46-ac13-d5f5bf75f371",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.26",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.26 (G), p. 11",
+     "text": "G 8.26 Notwithstanding paragraphs 8.19 to 8.21, a financial institution may also perform e-KYC where identification and verification is conducted solely by a human representative. This includes cases where the decision to verify a customer is conducted by a financial institution representative, intermediary or insurance agent, with the assistance of electronic means such as video calls using mobile devices.",
+     "page": 13,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.21 say?",
+     "rerank_score": 0.9037963,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "44de57d5-4fe9-50ed-9148-903d8d663736",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.27",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.27 (G), p. 11",
+     "text": "G 8.27 In contrast with e-KYC solutions under paragraphs 8.19 to 8.21 that utilise both machine and human 12 capabilities, e-KYC performed solely by a human representative through electronic means may involve a lower level of identity assurance due to human limitations and thus may not be suitable for all circumstances.\n[12] By virtue of audits that are conducted under Appendix 2.",
+     "page": 13,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.21 say?",
+     "rerank_score": 0.89033234,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "0b7352b8-162b-5a06-b0b5-c2cc63a10d14",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.22",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.22 (S), p. 10",
+     "text": "S 8.22 Financial institutions shall ensure that the technology provider appointed to provide the e-KYC solution conducts the following:\n(i) Ensure that the e-KYC solution, encompassing the three (3) e-KYC modules namely document verification, biometric matching and liveness detection as referenced in paragraph 8.10, has been assessed by a credible 9 external independent assessor in accordance with the scope and criteria as provided in Appendix 3. This includes ensuring that the technology provider has put measures in place to address the gaps or weaknesses identified from such assessment in a timely manner;\n(ii) Ensure that the relevant certification(s) is obtained for the various modules under e-KYC solution, where such certification is available 10 .\n[9] Credible external independent assessor refers to an assessor who has the capability and expertise in conducting assessments on identity verification solutions.\n[10] The modules are biometric matching/facial recognition, liveness test and ID verification. For example, ISO 197945 for facial recognition and ISO 30107-3 for liveness test (presentation attack detection) module.",
+     "page": 12,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.21 say?",
+     "rerank_score": 0.8358054,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "38e9e4a1-bf07-5cfb-ac4f-495edd152dc7",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.20",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.20 (S), p. 9",
+     "text": "S 8.20 Where the decision to verify a customer's identity through e-KYC is automated with the use of artificial intelligence, machine learning or other forms of predictive algorithms, whether in whole or in part, a financial institution shall ensure that the e-KYC solution is continuously capable of accurately distinguishing between genuine and non-genuine cases of customer onboarding.",
+     "page": 11,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.21 say?",
+     "rerank_score": 0.83419085,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ekyc:8.21",
+    "ekyc:8.20"
+   ],
+   "evidence_keys": [
+    "ekyc:8.21",
+    "ekyc:8.26",
+    "ekyc:8.27",
+    "ekyc:8.22",
+    "ekyc:8.20"
+   ],
+   "citation_recall": 1.0,
+   "evidence_recall": 1.0,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 2,
+   "input_tokens": 3119,
+   "output_tokens": 1330,
+   "latency_ms": 74,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "lookup-3",
+   "category": "direct_lookup",
+   "mode": "traditional",
+   "conversation": "User: What does paragraph 9.1 of the Fair Treatment of Financial Consumers policy require?",
+   "standalone_question": "What does paragraph 9.1 of the Fair Treatment of Financial Consumers policy require?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 9.1 of the Fair Treatment of Financial Consumers policy requires financial service providers to prominently publish their commitment to treating consumers fairly and how they intend to implement it on their website.",
+    "statements": [
+     {
+      "text": "A financial service provider must prominently publish its commitment to treating financial consumers fairly on its website.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "prominently publish its commitment towards treating financial consumers fairly",
+      "topic": "fair treatment commitment"
+     },
+     {
+      "text": "A financial service provider must publish how it intends to implement its commitments towards treating financial consumers fairly on its website.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "how it intends to implement such commitments on its website",
+      "topic": "implementation publication"
+     },
+     {
+      "text": "As guidance, these commitments may be set out in a separate charter or incorporated into a Customer Service Charter with adequate prominence.",
+      "obligation": "should_or_may",
+      "evidence_ids": [
+       "E2"
+      ],
+      "quote": "commitments may be set out in a separate Treat Customers Fairly Charter or incorporated into its Customer Service Charter",
+      "topic": "charter guidance"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "8802740a-d793-5ff0-9be3-a9fe3ec4050d",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "9.1",
+     "provision": "S",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 9.1 (S), p. 8",
+     "text": "S 9.1 A FSP shall prominently publish its commitment towards treating financial consumers fairly and how it intends to implement such commitments on its website.",
+     "page": 9,
+     "source": "search",
+     "query": "What does paragraph 9.1 of the Fair Treatment of Financial Consumers policy require?",
+     "rerank_score": 0.9776798,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "ad6b1b46-c805-5362-981a-c16c46cad7d6",
+     "document": "ftfc",
+     "scope": "main",
+     "paragraph_id": "9.2",
+     "provision": "G",
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, para 9.2 (G), p. 8",
+     "text": "G 9.2 For the purposes of paragraph 9.1, the commitments may be set out in a separate Treat Customers Fairly Charter or incorporated into its Customer Service Charter with adequate prominence. Appendix 2 of this Policy Document provides an illustration of a Treat Customers Fairly Charter.",
+     "page": 9,
+     "source": "search",
+     "query": "What does paragraph 9.1 of the Fair Treatment of Financial Consumers policy require?",
+     "rerank_score": 0.93489623,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "669697cb-ee95-5752-a449-dba122b6b318",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "9.1",
+     "provision": null,
+     "sector": null,
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 9.1, p. 17",
+     "text": "9.1 Enforcement and/or supervisory actions can be taken against the reporting institutions including its directors, officers and employees for any noncompliance with any provision marked as \"S\" in Part B of this policy document.",
+     "page": 20,
+     "source": "search",
+     "query": "What does paragraph 9.1 of the Fair Treatment of Financial Consumers policy require?",
+     "rerank_score": 0.90552294,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "cb826223-f22e-5711-8c9e-ed29b71faeaf",
+     "document": "ftfc",
+     "scope": "Appendix 1",
+     "paragraph_id": null,
+     "provision": null,
+     "sector": null,
+     "citation": "Fair Treatment of Financial Consumers Policy Document, APPENDIX 1 FAIR OUTCOMES TO FINANCIAL CONSUMERS, p. 46",
+     "text": "A FSP meets the outcomes of FTFC when it-\n(a) can trust that the FSP conduct its business with justness, impartiality, honesty and integrity, and delivers its promises and honours its commitments as it has led its customers to expect;\n(b) commits through appropriate policies, processes and controls to ensure that financial consumers and vulnerable consumers are consistently offered financial services and products that are suitable to their needs, financial circumstances and risk appetite, and when they receive advice, the advice is right for them;\n(c) provides appropriate notification to financial consumers prior to a change in the FSP's terms and conditions, rates, or fees and charges;\n(d) does not impose excessive or unreasonable fees and charges that do not reflect the actual costs incurred in the provision of services offered or which significantly disadvantage certain groups of financial consumers, particularly vulnerable consumers;\n(e) treats financial consumers, including vulnerable consumers in a courteous and fair manner and does not take advantage of such financial consumers due to their circumstances (e.g. age, education level);\n(f) has dispute resolution processes that are easily accessible and handles financial consumers' complaints and claims promptly, fairly and effectively; and\n(g) does not treat vulnerable consumers unfairly or exclude them from essential financial services or products.",
+     "page": 47,
+     "source": "search",
+     "query": "What does paragraph 9.1 of the Fair Treatment of Financial Consumers policy require?",
+     "rerank_score": 0.8522482,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "1e12ccc5-8a1a-55b7-b82f-95c1f855fa3e",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "9.1",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 9.1 (S), p. 12",
+     "text": "S 9.1 In monitoring the effectiveness and accuracy of e-KYC solutions utilising artificial intelligence, machine learning or other forms of predictive algorithms, a financial institution shall maintain a record of the performance of the e-KYC solution segregated on a monthly basis.",
+     "page": 14,
+     "source": "search",
+     "query": "What does paragraph 9.1 of the Fair Treatment of Financial Consumers policy require?",
+     "rerank_score": 0.83256364,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ftfc:9.1",
+    "ftfc:9.2"
+   ],
+   "evidence_keys": [
+    "ftfc:9.1",
+    "ftfc:9.2",
+    "amlcft:9.1",
+    "ftfc:Appendix 1:-",
+    "ekyc:9.1"
+   ],
+   "citation_recall": 1.0,
+   "evidence_recall": 1.0,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1317,
+   "output_tokens": 1286,
+   "latency_ms": 78,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "lookup-4",
+   "category": "direct_lookup",
+   "mode": "traditional",
+   "conversation": "User: What does paragraph 24.3 of the AML/CFT policy document say?",
+   "standalone_question": "What does paragraph 24.3 of the AML/CFT policy document say?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 24.3 requires reporting institutions to keep records for at least six years following transaction completion, the termination of the business relationship, or the date of an occasional transaction.",
+    "statements": [
+     {
+      "text": "Reporting institutions must keep records for at least six years following transaction completion, the termination of the business relationship, or the date of the occasional transaction.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "keep the records for at least six years following the completion of the transaction",
+      "topic": "record retention"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "edce55a8-afd5-50ce-87f7-e9329ff198be",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "24.3",
+     "provision": "S",
+     "sector": null,
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 24.3 (S), p. 108",
+     "text": "S 24.3 Reporting institutions are required to keep the records for at least six years following the completion of the transaction, the termination of the business relationship or after the date of the occasional transaction.",
+     "page": 111,
+     "source": "search",
+     "query": "What does paragraph 24.3 of the AML/CFT policy document say?",
+     "rerank_score": 0.9769875,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "59311df1-8de8-5f9a-8570-5d7fc273977a",
+     "document": "amlcft",
+     "scope": "Appendix 4a",
+     "paragraph_id": "24",
+     "provision": null,
+     "sector": null,
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, Appendix 4a, para 24, p. 152",
+     "text": "24. Large cash withdrawals from a previously dormant/inactive account, or from an account which has just received an unexpectedly large credit from abroad.",
+     "page": 155,
+     "source": "search",
+     "query": "What does paragraph 24.3 of the AML/CFT policy document say?",
+     "rerank_score": 0.91751724,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "ef89c4f6-a4f8-55b1-9ca6-cc70412ea6d8",
+     "document": "amlcft",
+     "scope": "Appendix 4a",
+     "paragraph_id": "24",
+     "provision": null,
+     "sector": null,
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, Appendix 4a, para 24, p. 155",
+     "text": "24. Customers who repay problem loans unexpectedly and with no proper explanation as to the source of funds.",
+     "page": 158,
+     "source": "search",
+     "query": "What does paragraph 24.3 of the AML/CFT policy document say?",
+     "rerank_score": 0.89871323,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "ea40225c-47df-5798-bc8f-752c2eb0cd7c",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "24.1",
+     "provision": "S",
+     "sector": null,
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 24.1 (S), p. 108",
+     "text": "S 24.1 Reporting institutions are required to keep the relevant records including any accounts, files, business correspondence and documents relating to transactions, in particular, those obtained during the CDD process. This includes documents used to verify the identity of customers and beneficial owners, and the results of any analysis undertaken. The records maintained must remain up-to-date and relevant.",
+     "page": 111,
+     "source": "search",
+     "query": "What does paragraph 24.3 of the AML/CFT policy document say?",
+     "rerank_score": 0.8331075,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "25febe00-9e9d-5862-89b3-c714456f5fb0",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "24.2",
+     "provision": "S",
+     "sector": null,
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 24.2 (S), p. 108",
+     "text": "S 24.2 Reporting institutions must ensure that all relevant records relating to transactions which are kept are sufficient to permit reconstruction of individual transactions so as to provide, if necessary, evidence for prosecution of criminal activity.",
+     "page": 111,
+     "source": "search",
+     "query": "What does paragraph 24.3 of the AML/CFT policy document say?",
+     "rerank_score": 0.81850475,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "amlcft:24.3"
+   ],
+   "evidence_keys": [
+    "amlcft:24.3",
+    "amlcft:Appendix 4a:24",
+    "amlcft:Appendix 4a:24",
+    "amlcft:24.1",
+    "amlcft:24.2"
+   ],
+   "citation_recall": 1.0,
+   "evidence_recall": 1.0,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1097,
+   "output_tokens": 927,
+   "latency_ms": 84,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "xref-1",
+   "category": "cross_reference",
+   "mode": "traditional",
+   "conversation": "User: What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+   "standalone_question": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 8.10 provides guidance that financial institutions may undertake document verification, biometric matching, and liveness detection when identifying and verifying an individual's identity. It refers to the identification and verification requirements under paragraph 8.4 of the e-KYC policy document and the AML/CFT/CPF and TFS for FIs policy document.",
+    "statements": [
+     {
+      "text": "Paragraph 8.10 provides guidance that financial institutions may undertake measures such as document verification, biometric matching, and liveness detection when identifying and verifying an individual's identity through e-KYC.",
+      "obligation": "should_or_may",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "a financial institution may undertake measures, including but not limited to the following",
+      "topic": "e-KYC measures"
+     },
+     {
+      "text": "Paragraph 8.10 refers to the requirement to identify and verify an individual's identity through e-KYC under paragraph 8.4 of the policy document and the AML/CFT/CPF and TFS for FIs policy document.",
+      "obligation": "information",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "as required under paragraph 8.4 of this policy document and the AML/CFT/CPF and TFS for FIs policy document",
+      "topic": "referred rule"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "ce5686c5-8b53-5f53-822b-5a0e4f4311e4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.10",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.10 (G), p. 7",
+     "text": "G 8.10 In identifying and verifying an individual's identity through e-KYC as required under paragraph 8.4 of this policy document and the AML/CFT/CPF and TFS for FIs policy document, a financial institution may undertake measures, including but not limited to the following-\n(i) Document verification - i.e., ensuring that the government issued ID to support e-KYC customer verification is authentic by utilising appropriate fraud detection mechanisms;\n(ii) Biometric matching - i.e., verifying the customer against a government issued ID 3 by utilising biometric technology; and/or\n(iii) Liveness detection - i.e, ensuring the customer is a live subject and not an impersonator (e.g. through use of photos, videos, synthetic human face masks 4 ) by utilising liveness detection.\n[3] i.e, National Registration Identity Card (NRIC), passport, or any other official documents.\n[4] Synthetic human face masks are designed to impersonate real human faces and made from materials such as silicone or otherwise. For purposes of e-KYC, such masks may be used to defraud facial recognition software.",
+     "page": 9,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.9780182,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "3db25895-78f7-5a61-9bd1-3e165982abd4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.9",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.9 (S), p. 7",
+     "text": "S 8.9 In verifying the identity of an individual or beneficial owner under paragraphs 8.10 and 8.13 of this policy document and as required under the AML/CFT/CPF and TFS for FIs policy document, financial institutions shall:\n(i) be satisfied with the identity of the individual or the beneficial owner through reliable and independent documentation, electronic data or any other measures that the financial institution deems necessary;\n(ii) be satisfied with the veracity of information referred to in paragraph 8.9 (i) when verifying the identity of the individual or beneficial owner; and\n(iii) ensure that documents, data or information collected is kept up-to-date and relevant.",
+     "page": 9,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.951612,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "0b7352b8-162b-5a06-b0b5-c2cc63a10d14",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.22",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.22 (S), p. 10",
+     "text": "S 8.22 Financial institutions shall ensure that the technology provider appointed to provide the e-KYC solution conducts the following:\n(i) Ensure that the e-KYC solution, encompassing the three (3) e-KYC modules namely document verification, biometric matching and liveness detection as referenced in paragraph 8.10, has been assessed by a credible 9 external independent assessor in accordance with the scope and criteria as provided in Appendix 3. This includes ensuring that the technology provider has put measures in place to address the gaps or weaknesses identified from such assessment in a timely manner;\n(ii) Ensure that the relevant certification(s) is obtained for the various modules under e-KYC solution, where such certification is available 10 .\n[9] Credible external independent assessor refers to an assessor who has the capability and expertise in conducting assessments on identity verification solutions.\n[10] The modules are biometric matching/facial recognition, liveness test and ID verification. For example, ISO 197945 for facial recognition and ISO 30107-3 for liveness test (presentation attack detection) module.",
+     "page": 12,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.9189106,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "6f1b8c9d-7289-5b38-964a-0773abc0628b",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.12",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.12 (G), p. 8",
+     "text": "G 8.12 A financial institution may implement e-KYC to identify and verify legal persons, subject to meeting the requirements in this policy document and the requirements for legal persons specified under the AML/CFT/CPF and TFS for FIs policy document 6 on CDD for legal persons.\n[5] For avoidance of doubt, a sole proprietor is not deemed as legal person under this policy document. Accordingly, the on-boarding of sole proprietors through e-KYC is subject to e-KYC process for individual as specified under paragraph 8.10.\n[6] In particular, requirements relating to legal persons as well as clubs, societies and charities contained within paragraphs 14A.9, 14B.11, 14C.10 and 14D.9 of the AML/CFT/CPF and TFs for FIs Policy Document.",
+     "page": 10,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.8854731,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "a80f320a-f4ca-5834-95b1-5a5f1d7042de",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.16",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.16 (S), p. 9",
+     "text": "S 8.16 In relation to paragraph 8.13 (ii), where the identification and verification of the authorised person is conducted via electronic means, a financial institution shall ensure that -\n(i) electronic communication or documents that capture collective decision making by the directors of the legal person (e.g. digital forms of Directors Resolution or Letter of Authority) to appoint the authorised person and establish business relations are maintained in accordance with relevant record keeping requirements as specified under paragraph 24 of the AML/CFT/CPF and TFS for FIs Policy Document;\n(ii) such electronic means adopted to identify and verify the authorised person are within the legal person's constitution or any other document which sets out the powers of the legal person; and\n(iii) the authorised person is identified and verified through e-KYC as an individual, having due regard to the measures listed under paragraph 8.10 of this policy document.",
+     "page": 11,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.10 require, including the rule it refers to?",
+     "rerank_score": 0.8766766,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ekyc:8.10"
+   ],
+   "evidence_keys": [
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.22",
+    "ekyc:8.12",
+    "ekyc:8.16"
+   ],
+   "citation_recall": 0.5,
+   "evidence_recall": 0.5,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1857,
+   "output_tokens": 1630,
+   "latency_ms": 66,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "xref-2",
+   "category": "cross_reference",
+   "mode": "traditional",
+   "conversation": "User: What does e-KYC paragraph 8.5 say about paragraph 8.4?",
+   "standalone_question": "What does e-KYC paragraph 8.5 say about paragraph 8.4?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 8.5 clarifies that references to face-to-face processes in relation to paragraph 8.4 should mainly serve as guidance on the minimum expected baseline, supporting the mandatory requirement for secure and effective e-KYC measures under paragraph 8.4.",
+    "statements": [
+     {
+      "text": "References to face-to-face processes in relation to paragraph 8.4 should mainly serve as guidance on the minimum expected baseline.",
+      "obligation": "should_or_may",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "where reference is made to face-to-face processes, this should mainly serve as guidance on the minimum expected baseline.",
+      "topic": "face-to-face guidance"
+     },
+     {
+      "text": "A financial institution must ensure and be able to demonstrate that appropriate e-KYC identification and verification measures are secure, effective, and proportionate to risk dimensions.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E2"
+      ],
+      "quote": "a financial institution shall ensure and be able to demonstrate on a continuing basis that appropriate measures for the identification and verification of a customer's identity through e-KYC are secure and effective.",
+      "topic": "secure and effective measures"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "2eaebd7b-7a27-57b0-bc3f-fff859fbaa33",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.5",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.5 (G), p. 6",
+     "text": "G 8.5 In relation to paragraph 8.4, where reference is made to face-to-face processes, this should mainly serve as guidance on the minimum expected baseline.",
+     "page": 8,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.5 say about paragraph 8.4?",
+     "rerank_score": 0.97716254,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "454ad958-1ca3-5a1b-afdf-e2eaaa17e60d",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.4",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.4 (S), p. 6",
+     "text": "S 8.4 In line with requirements under the AML/CFT/CPF and TFS for FIs policy document, a financial institution shall ensure and be able to demonstrate on a continuing basis that appropriate measures for the identification and verification of a customer's identity through e-KYC are secure and effective. Measures for identification and verification shall be proportionate to the risk dimensions of eKYC.",
+     "page": 8,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.5 say about paragraph 8.4?",
+     "rerank_score": 0.93186045,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "ce5686c5-8b53-5f53-822b-5a0e4f4311e4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.10",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.10 (G), p. 7",
+     "text": "G 8.10 In identifying and verifying an individual's identity through e-KYC as required under paragraph 8.4 of this policy document and the AML/CFT/CPF and TFS for FIs policy document, a financial institution may undertake measures, including but not limited to the following-\n(i) Document verification - i.e., ensuring that the government issued ID to support e-KYC customer verification is authentic by utilising appropriate fraud detection mechanisms;\n(ii) Biometric matching - i.e., verifying the customer against a government issued ID 3 by utilising biometric technology; and/or\n(iii) Liveness detection - i.e, ensuring the customer is a live subject and not an impersonator (e.g. through use of photos, videos, synthetic human face masks 4 ) by utilising liveness detection.\n[3] i.e, National Registration Identity Card (NRIC), passport, or any other official documents.\n[4] Synthetic human face masks are designed to impersonate real human faces and made from materials such as silicone or otherwise. For purposes of e-KYC, such masks may be used to defraud facial recognition software.",
+     "page": 9,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.5 say about paragraph 8.4?",
+     "rerank_score": 0.88685226,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "3db25895-78f7-5a61-9bd1-3e165982abd4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.9",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.9 (S), p. 7",
+     "text": "S 8.9 In verifying the identity of an individual or beneficial owner under paragraphs 8.10 and 8.13 of this policy document and as required under the AML/CFT/CPF and TFS for FIs policy document, financial institutions shall:\n(i) be satisfied with the identity of the individual or the beneficial owner through reliable and independent documentation, electronic data or any other measures that the financial institution deems necessary;\n(ii) be satisfied with the veracity of information referred to in paragraph 8.9 (i) when verifying the identity of the individual or beneficial owner; and\n(iii) ensure that documents, data or information collected is kept up-to-date and relevant.",
+     "page": 9,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.5 say about paragraph 8.4?",
+     "rerank_score": 0.7151058,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "5ce3e78f-17da-5700-b476-aff58e47f945",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.7",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.7 (S), p. 7",
+     "text": "S 8.7 A financial institution shall adopt an appropriate combination of authentication factors when establishing measures to verify the identity of a customer being on-boarded through e-KYC. The strength and combination of the authentication factors shall be commensurate to the risks associated with inaccurate identification for a particular product or service.",
+     "page": 9,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.5 say about paragraph 8.4?",
+     "rerank_score": 0.6939709,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ekyc:8.5",
+    "ekyc:8.4"
+   ],
+   "evidence_keys": [
+    "ekyc:8.5",
+    "ekyc:8.4",
+    "ekyc:8.10",
+    "ekyc:8.9",
+    "ekyc:8.7"
+   ],
+   "citation_recall": 1.0,
+   "evidence_recall": 1.0,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1440,
+   "output_tokens": 1006,
+   "latency_ms": 153,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "xref-3",
+   "category": "cross_reference",
+   "mode": "traditional",
+   "conversation": "User: What does e-KYC paragraph 8.16 require, and which requirement is it part of?",
+   "standalone_question": "What does e-KYC paragraph 8.16 require, and which requirement is it part of?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "Paragraph 8.16 requires financial institutions to follow specific conditions when identifying and verifying an authorised person via electronic means, and it is part of the requirements under paragraph 8.13(ii) regarding legal persons.",
+    "statements": [
+     {
+      "text": "Paragraph 8.16 is part of the requirements in relation to paragraph 8.13(ii) where the identification and verification of an authorised person is conducted via electronic means.",
+      "obligation": "information",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "In relation to paragraph 8.13 (ii), where the identification and verification of the authorised person is conducted via electronic means",
+      "topic": "parent requirement"
+     },
+     {
+      "text": "A financial institution must ensure that electronic communications or documents capturing collective decision making by directors to appoint the authorised person are maintained in accordance with AML/CFT/CPF and TFS record keeping requirements.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "electronic communication or documents that capture collective decision making by the directors of the legal person",
+      "topic": "record keeping"
+     },
+     {
+      "text": "A financial institution must ensure that the electronic means adopted to identify and verify the authorised person are within the legal person's constitution or any other document setting out its powers.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "such electronic means adopted to identify and verify the authorised person are within the legal person's constitution or any other document which sets out the powers of the legal person",
+      "topic": "constitution and powers"
+     },
+     {
+      "text": "A financial institution must ensure that the authorised person is identified and verified through e-KYC as an individual, with due regard to the measures listed under paragraph 8.10.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "the authorised person is identified and verified through e-KYC as an individual, having due regard to the measures listed under paragraph 8.10 of this policy document",
+      "topic": "e-KYC verification"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "a80f320a-f4ca-5834-95b1-5a5f1d7042de",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.16",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.16 (S), p. 9",
+     "text": "S 8.16 In relation to paragraph 8.13 (ii), where the identification and verification of the authorised person is conducted via electronic means, a financial institution shall ensure that -\n(i) electronic communication or documents that capture collective decision making by the directors of the legal person (e.g. digital forms of Directors Resolution or Letter of Authority) to appoint the authorised person and establish business relations are maintained in accordance with relevant record keeping requirements as specified under paragraph 24 of the AML/CFT/CPF and TFS for FIs Policy Document;\n(ii) such electronic means adopted to identify and verify the authorised person are within the legal person's constitution or any other document which sets out the powers of the legal person; and\n(iii) the authorised person is identified and verified through e-KYC as an individual, having due regard to the measures listed under paragraph 8.10 of this policy document.",
+     "page": 11,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.16 require, and which requirement is it part of?",
+     "rerank_score": 0.9742002,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "f5c38557-03c6-5214-acc7-94c9496fba42",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.17",
+     "provision": "G",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.17 (G), p. 9",
+     "text": "G 8.17 In respect of paragraph 8.16 (i), such electronic means to capture collective decision making by the directors of the legal person on the appointment of the authorised person may include but are not limited to the following:\n(i) utilising electronic technologies that identify and verify the directors, and subsequently capture evidence of directors' consent (e.g. audited/circulated email trails, providing agreement or disagreement through personal secure authentication links for directors to consent, video-conferencing to verify consent, digital signatures, use of secure electronic voting platforms, etc); and/or\n(ii) using third parties (e.g. Digital Company Secretaries) that may provide confirmation on the legitimacy of relevant evidence such as the Directors Resolution or Letter of Authority.",
+     "page": 11,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.16 require, and which requirement is it part of?",
+     "rerank_score": 0.9373486,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "504aac0d-9933-5941-8a01-a8823c67e5ab",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "5.2",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 5.2, p. 4",
+     "text": "\"legal person\" means a legal person as specified under paragraph 6.2 of the AML/CFT/CPF and TFS for FIs policy document. It refers to any entity other than a natural person that can establish a permanent customer relationship with a reporting institution or otherwise own property. This includes companies, bodies corporate, government-linked companies (GLC), foundations, partnerships, or associations and other similar entities.\nGLC refers to an entity where the government is the majority shareholder or single largest shareholder and/or has the ability to exercise and influence major decisions such as appointment of board members and senior management.\n\"the Bank\" means Bank Negara Malaysia.\n\"True Positive\" refers to identification and verification cases processed under e-KYC solutions in which the solution rightly accepted and verified an identity. These include cases of genuine identities or documents that were rightly accepted.\n\"True Negative\" refers to identification and verification cases processed under e-KYC solutions in which the solution rightly rejected and did not verify an identity. These include cases of false or unclear identities, forged or tampered documents and unclear images that were rightly rejected:\n[1] By means of a letter of authority or directors' resolution or by electronic means, as permitted under the legal person's constitution. For avoidance of doubt, requirements relating to such electronic means can be referred in paragraph 8.16 of this policy document.\n[2] This includes the cases of standard and simplified CDD on individuals, legal persons and beneficiaries as specified under the AML/CFT/CPF and TFS for FIs policy document.",
+     "page": 6,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.16 require, and which requirement is it part of?",
+     "rerank_score": 0.9251894,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "3db25895-78f7-5a61-9bd1-3e165982abd4",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.9",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.9 (S), p. 7",
+     "text": "S 8.9 In verifying the identity of an individual or beneficial owner under paragraphs 8.10 and 8.13 of this policy document and as required under the AML/CFT/CPF and TFS for FIs policy document, financial institutions shall:\n(i) be satisfied with the identity of the individual or the beneficial owner through reliable and independent documentation, electronic data or any other measures that the financial institution deems necessary;\n(ii) be satisfied with the veracity of information referred to in paragraph 8.9 (i) when verifying the identity of the individual or beneficial owner; and\n(iii) ensure that documents, data or information collected is kept up-to-date and relevant.",
+     "page": 9,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.16 require, and which requirement is it part of?",
+     "rerank_score": 0.8537177,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "454ad958-1ca3-5a1b-afdf-e2eaaa17e60d",
+     "document": "ekyc",
+     "scope": "main",
+     "paragraph_id": "8.4",
+     "provision": "S",
+     "sector": null,
+     "citation": "e-KYC Policy Document, para 8.4 (S), p. 6",
+     "text": "S 8.4 In line with requirements under the AML/CFT/CPF and TFS for FIs policy document, a financial institution shall ensure and be able to demonstrate on a continuing basis that appropriate measures for the identification and verification of a customer's identity through e-KYC are secure and effective. Measures for identification and verification shall be proportionate to the risk dimensions of eKYC.",
+     "page": 8,
+     "source": "search",
+     "query": "What does e-KYC paragraph 8.16 require, and which requirement is it part of?",
+     "rerank_score": 0.8447167,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "ekyc:8.16"
+   ],
+   "evidence_keys": [
+    "ekyc:8.16",
+    "ekyc:8.17",
+    "ekyc:5.2",
+    "ekyc:8.9",
+    "ekyc:8.4"
+   ],
+   "citation_recall": 0.5,
+   "evidence_recall": 0.5,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1757,
+   "output_tokens": 1783,
+   "latency_ms": 59,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes",
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  },
+  {
+   "item_id": "xref-4",
+   "category": "cross_reference",
+   "mode": "traditional",
+   "conversation": "User: What does AML/CFT paragraph 14A.15.9 require, and which paragraph does it build on?",
+   "standalone_question": "What does AML/CFT paragraph 14A.15.9 require, and which paragraph does it build on?",
+   "expected_outcome": "answer",
+   "observed_outcome": "answer",
+   "outcome_correct": true,
+   "status": "answered",
+   "answer": {
+    "status": "answered",
+    "summary": "AML/CFT paragraph 14A.15.9 requires reporting institutions to take specific measures to identify and verify a customer's identity in relation to paragraph 14A.15.7.",
+    "statements": [
+     {
+      "text": "Reporting institutions must take measures to identify and verify the customer's identity through establishing independent contact, verifying information against reliable sources, or requesting additional documents for face-to-face verifications.",
+      "obligation": "must",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "reporting institutions shall take measures to identify and verify the customer's identity",
+      "topic": "requirements"
+     },
+     {
+      "text": "Paragraph 14A.15.9 is formulated in relation to paragraph 14A.15.7.",
+      "obligation": "information",
+      "evidence_ids": [
+       "E1"
+      ],
+      "quote": "In relation to paragraph 14A.15.7",
+      "topic": "underlying paragraph"
+     }
+    ],
+    "gaps": null
+   },
+   "evidence": [
+    {
+     "id": "E1",
+     "chunk_id": "b88e5c62-f55f-5d97-a4ec-1385c0b0bf60",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14A.15.9",
+     "provision": "S",
+     "sector": "banking",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14A.15.9 (S), p. 46",
+     "text": "S 14A.15.9 In relation to paragraph 14A.15.7, reporting institutions shall take measures to identify and verify the customer's identity through any of the following: (a) establishing independent contact with the customer; (b) verifying the customer's information against reliable and independent sources to confirm the customer's identity and identifying any known or suspected ML/TF/PF risks associated with the customer; or (c) requesting, sighting and maintaining records of additional documents required to perform face-to-face customer verifications.",
+     "page": 49,
+     "source": "search",
+     "query": "What does AML/CFT paragraph 14A.15.9 require, and which paragraph does it build on?",
+     "rerank_score": 0.9717361,
+     "requested_sector": null
+    },
+    {
+     "id": "E2",
+     "chunk_id": "9b800f38-3729-52e2-a3d2-957e6617187a",
+     "document": "ekyc",
+     "scope": "Appendix 3",
+     "paragraph_id": "1",
+     "provision": null,
+     "sector": null,
+     "citation": "e-KYC Policy Document, Appendix 3, para 1, p. 20",
+     "text": "1. The AML/CFT/CPF & TFS for FI PD 25 requires reporting institutions to ensure the systems and technology deployed for the purpose of establishing a business relationship using non-face-to-face channels (including e-KYC) have the capabilities to support an effective AML/CFT/CPF compliance programme 26 .\n[25] Under paragraphs 14A.15.8 (for Banking and Deposit-Taking Institutions), 14.17.10 (for Insurance and Takaful), 14C.16.13 (for Money Services Business) and 14D.16.11 (for Non-Bank Issuers of Designated Payment Instruments and Designated Islamic Payment Instruments).\n[26] As part of the AML/CFT/CPF compliance programme, under paragraph 14A.3 (for Banking and Deposit-Taking Institutions), 14B.3 (for Insurance and Takaful), 14C.4 (for Money Services Business) and 14D.3 (for Non-Bank Issuers of Designated Payment Instruments and Designated Islamic Payment Instruments), reporting institutions are required to conduct customer due diligence (CDD) to identify the customer and verify that the customer's identity using reliable, independent source document, data or information.",
+     "page": 22,
+     "source": "search",
+     "query": "What does AML/CFT paragraph 14A.15.9 require, and which paragraph does it build on?",
+     "rerank_score": 0.8650418,
+     "requested_sector": null
+    },
+    {
+     "id": "E3",
+     "chunk_id": "b294d656-bd8f-5689-89fd-014d25aea5b6",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14A.15.8",
+     "provision": "G",
+     "sector": "banking",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14A.15.8 (G), p. 46",
+     "text": "G 14A.15.8 In relation to paragraph 14A.15.7, where reference is made to face-to-face processes, this should mainly serve as a guide on the minimum expected baseline.",
+     "page": 49,
+     "source": "search",
+     "query": "What does AML/CFT paragraph 14A.15.9 require, and which paragraph does it build on?",
+     "rerank_score": 0.8542049,
+     "requested_sector": null
+    },
+    {
+     "id": "E4",
+     "chunk_id": "45195173-fc1c-5f9a-87f0-04f2fb32acb3",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14A.15.2",
+     "provision": "S",
+     "sector": "banking",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14A.15.2 (S), p. 45",
+     "text": "S 14A.15.2 The requirements on non-FTF business relationship shall be read together with the Electronic Know Your Customer (e-KYC) policy document and any relevant policy document, guidelines or circulars issued pursuant to the e-KYC policy document.",
+     "page": 48,
+     "source": "search",
+     "query": "What does AML/CFT paragraph 14A.15.9 require, and which paragraph does it build on?",
+     "rerank_score": 0.8467552,
+     "requested_sector": null
+    },
+    {
+     "id": "E5",
+     "chunk_id": "d88a25e3-ded6-5227-bfbb-62e66bcaa16f",
+     "document": "amlcft",
+     "scope": "main",
+     "paragraph_id": "14A.9.16",
+     "provision": "S",
+     "sector": "banking",
+     "citation": "AML/CFT/CPF and TFS for FIs Policy Document, para 14A.9.16 (S), p. 37",
+     "text": "S 14A.9.16 Where reliance is placed on third parties under paragraph 14A.9.15, reporting institutions are required to comply with paragraph 16 on Reliance on Third Parties.",
+     "page": 40,
+     "source": "search",
+     "query": "What does AML/CFT paragraph 14A.15.9 require, and which paragraph does it build on?",
+     "rerank_score": 0.83473045,
+     "requested_sector": null
+    }
+   ],
+   "cited_keys": [
+    "amlcft:14A.15.9"
+   ],
+   "evidence_keys": [
+    "amlcft:14A.15.9",
+    "ekyc:Appendix 3:1",
+    "amlcft:14A.15.8",
+    "amlcft:14A.15.2",
+    "amlcft:14A.9.16"
+   ],
+   "citation_recall": 0.5,
+   "evidence_recall": 0.5,
+   "verified": true,
+   "notes": [],
+   "llm_calls": 1,
+   "input_tokens": 1442,
+   "output_tokens": 1521,
+   "latency_ms": 70,
+   "cached": true,
+   "error": null,
+   "verdicts": [
+    "yes",
+    "yes"
+   ],
+   "faithfulness": 1.0,
+   "relevancy": 5,
+   "judge_model": "google_genai:gemini-3.1-flash-lite",
+   "self_judged": false,
+   "cross_check_verdicts": []
+  }
+ ]
+}
