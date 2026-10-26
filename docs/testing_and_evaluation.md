@@ -90,10 +90,11 @@ dense only, BM25 only, hybrid (RRF), + exact lookup, + rerank, + selection.
 - **Verifier pass rate:** answers passing every code check;
 - **Faithfulness** (LLM judge): the share of statements supported by their
   cited passages (partly = 0.5); a MUST citing a passage that only says "may"
-  counts as unsupported. **Relevancy** (judge): 1–5. The judge is
-  `gemini-3.1-flash-lite`, a different model from the generator
-  (`gemini-3.5-flash-lite`); answers judged by the generator's own model (a
-  fallback during outages) are counted and reported. A sample is meant to be
+  counts as unsupported. **Relevancy** (judge): 1–5. The judge is Gemini
+  `gemini-3.1-flash-lite`, a different model family from the generator
+  (DeepSeek `deepseek-flash`); an answer judged by a model that also answered it
+  (both fell back to the same Gemini model) is counted and reported, and so is
+  every answer that needed a fallback model. A sample is meant to be
   cross-checked by `gemini-3.8-flash`; in the full run it stopped after 3 calls
   (504 errors), so no answer was cross-checked and the judge is unvalidated;
 - **Cost:** LLM calls, tokens, latency p50 / p95 (live calls only, cached
@@ -102,36 +103,43 @@ dense only, BM25 only, hybrid (RRF), + exact lookup, + rerank, + selection.
 Every external result is cached, so a re-run after a change pays only for the
 calls whose input changed (`python -m evals.run --only <ids>`).
 
-## 4. Results (full run `20261026-0338-full`, 40 items × 2 modes, 0 errors)
+## 4. Results (full run `20261026-1728-full`, 40 items × 2 modes, 0 errors)
+
+Planner, reviewer and generator on DeepSeek `deepseek-flash`; judge on Gemini
+`gemini-3.1-flash-lite`. The Gemini column is the same evaluation before the
+switch (`20261026-0338-full`: planner and reviewer `gemini-3.1-flash-lite`,
+generator `gemini-3.5-flash-lite`, on the free tier).
 
 **Answers:**
 
-| Metric | Traditional | Agentic |
-|---|---|---|
-| Outcome accuracy | 95% | **100%** |
-| Citation recall | 80% | **91%** |
-| Evidence recall¹ | 82% | **92%** |
-| Verifier pass rate | 100% | 100% |
-| Faithfulness | 98% | 99% |
-| Relevancy (1–5) | 4.84 | 5.00 |
-| Answers judged by the generator's own model | 1 | 3 |
-| LLM calls per question | 1.05 | 2.85 |
-| Tokens per question | 2,778 | 4,907 |
-| Latency p50 / p95 | 4.4 s / 11.0 s | 25.1 s / 69.9 s |
+| Metric | Traditional | Agentic | Agentic on Gemini |
+|---|---|---|---|
+| Outcome accuracy | 95% | **100%** | 100% |
+| Citation recall | 82% | **91%** | 91% |
+| Evidence recall¹ | 82% | **91%** | 92% |
+| Verifier pass rate | 100% | 100% | 100% |
+| Faithfulness | 99% | 97% | 99% |
+| Relevancy (1–5) | 5.00 | 5.00 | 5.00 |
+| Answers that used a fallback model | 0 | 0 | not measured |
+| Answers judged by a model that also answered them | 0 | 0 | 3 |
+| LLM calls per question | 1.05 | 2.95 | 2.85 |
+| Tokens per question | 2,690 | 6,940 | 4,907 |
+| Latency p50 / p95 | 3.8 s / 5.8 s | 7.0 s / 18.4 s | 25.1 s / 69.9 s |
 
 ¹ Agentic counts every passage it gathered over several searches; traditional
 counts its top 5.
 
 By category, see [the investigation](agentic_rag_investigation.md#6-what-we-measured).
 
-**Retrieval ablation** (28 questions):
+**Retrieval ablation** (28 questions; no chat model is involved, so it doesn't
+depend on DeepSeek or Gemini):
 
 | Stage | Hit@5 | Recall@5 | MRR@5 |
 |---|---|---|---|
 | dense only | 93% | 83% | 0.86 |
 | BM25 only | 86% | 70% | 0.72 |
 | hybrid (RRF) | 96% | 81% | 0.85 |
-| + exact lookup | 96% | 81% | 0.82 |
+| + exact lookup | 96% | 81% | 0.85 |
 | + rerank | 96% | 84% | 0.86 |
 | + selection | 96% | 83% | 0.86 |
 
@@ -141,32 +149,29 @@ otherwise ties it (Recall@5 83% vs 83%, MRR@5 0.86 vs 0.86). BM25 alone is the
 weakest. The stages earn their place on specific question types rather than on
 the average: dense search alone doesn't have 14A.9.6 in its top 5 for a question
 naming it (it ranks 14A.9.16 first), and the exact-lookup stage puts a named
-paragraph first. The drop at "+ exact lookup" came from one item (lookup-3: the
-lookup ignored the document named in the question and put e-KYC 9.1 and AML
-9.1 above FTFC 9.1). This is the search engine's exact-lookup stage on the
-traditional path (the agent's `lookup_paragraphs` tool already passes the
-document). It was fixed after this run: the matches in the named document now
-come first. A traditional-mode re-run of the 8 items that name a paragraph
-(`20261026-1615-only`) gives lookup-3 MRR@5 1.00 at every stage, and no stage
-makes any of the 8 items worse. All 8 answers were unchanged (served from the
-cache): the reranker had already restored the order, so the dip never changed
-an answer.
+paragraph first. In the earlier Gemini run the exact-lookup stage dipped to
+0.82 because of one item (lookup-3: "paragraph 9.1 of the Fair Treatment …
+policy" put e-KYC 9.1 and AML 9.1 above FTFC 9.1). It was fixed before this run
+(the matches in the named document now come first), and the dip is gone.
 
 ## 5. Selected failure cases
 
-The full list is in the report's "Failures to analyse" section.
+The full list is in the report's "Failures to analyse" section. Items marked
+*(Gemini)* failed in the earlier Gemini run and not in the DeepSeek run.
 
 | Item | Where | What happened | Cause, and the fix we'd make |
 |---|---|---|---|
-| fact-10 | traditional answer | faithfulness 0.43: four MUST statements judged unsupported; gold FTFC 16.2 not retrieved | **ingestion:** FTFC "Good practices" / "Poor practice" boxes are stored under their S paragraph (50 chunks carry provision S), so the generator labelled good practices as obligations and the verifier's MUST-vs-G check couldn't catch it. Fix: give those chunks no S/G marker and re-index |
-| sector-4 | agentic answer | missed AML 14C.16.12 (money changers' video-call rule) | the planner rewrote it as an e-KYC question. Fix: tell the planner not to narrow a sector-rule question to one document (not changed on submission day, to keep the measured prompts) |
-| fact-6 | agentic answer | never retrieved e-KYC App. 2 para 11 (what the notification must include) | the planner's search wording, and the reviewer judged the evidence sufficient |
-| fact-3 | both answers | traditional retrieved e-KYC 8.27 but didn't cite it (the only pure generator miss); agentic never retrieved it | generator selection; agentic's searches were narrower |
-| compare-3, compare-4, compare-6, followup-1 | traditional answer | gold paragraphs never retrieved | one search can't cover a two-part question or a follow-up |
-| compare-5, compare-6 | agentic answer | some gold paragraphs never retrieved or not cited | comparisons need many paragraphs; 5 per search is tight |
-| xref-2 | agentic answer | faithfulness 0.75 (one statement "partly" supported) | a statement went a little beyond its passage |
+| followup-2 | agentic answer | never retrieved e-KYC 8.24 (the 3-year review rule) | "how often must that be reviewed?" was rewritten as a question about 8.22 itself, so the search stayed on 8.22. Fix: the planner keeps the follow-up's own subject in the rewritten question |
+| sector-3 | agentic answer | found the e-money requirements (AML 14D.16.2, .8, .10–.12) but not 14D.16.1, the paragraph that says it may | the searches went to the requirements; the reviewer judged them enough |
+| followup-4, fact-7 | agentic answer | faithfulness 0.67: some statements judged unsupported | statements that went beyond their passages |
+| fact-10 *(Gemini)* | traditional answer | faithfulness 0.43: four MUST statements judged unsupported | **ingestion:** FTFC "Good practices" / "Poor practice" boxes are stored under their S paragraph (50 chunks carry provision S), so good practices could be labelled obligations and the verifier's MUST-vs-G check couldn't catch it. Fix: give those chunks no S/G marker and re-index. On DeepSeek fact-10 only missed FTFC 16.2 in retrieval |
+| sector-4 *(Gemini)* | agentic answer | missed AML 14C.16.12 (money changers' video-call rule) | the planner narrowed it to e-KYC; DeepSeek found it |
+| fact-6 *(Gemini)* | agentic answer | never retrieved e-KYC App. 2 para 11 (what the notification must include) | DeepSeek retrieved and cited paras 10, 11 and 13 |
+| fact-3 | agentic answer | never retrieved e-KYC 8.27 | the searches were narrower than the question |
+| compare-1, compare-3, compare-4, compare-6, followup-1 | traditional answer | gold paragraphs never retrieved | one search can't cover a two-part question or a follow-up |
+| compare-4, compare-6 | agentic answer | some gold paragraphs never retrieved | comparisons need many paragraphs; 5 per search is tight |
 | compare-1, sector-1 | retrieval ablation | the reranker moved the gold paragraph from #1 to #2 | Cohere ranks a related paragraph first |
-| compare-4 | retrieval ablation | the reranker pushed 3 of 4 gold paragraphs (e-KYC 9.1, 9.2, AML 24.3) out of the top 5 | one search for a two-document comparison: the reranker favours one document. This is why the agent splits comparisons into one search per document |
+| compare-4 | retrieval ablation | the reranker pushed e-KYC 9.1, 9.2 and AML 24.3 out of the top 5 | one search for a two-document comparison: the reranker favours one document. This is why the agent splits comparisons into one search per document |
 | xref-1/3/4 | traditional answer | the referenced paragraph never retrieved | expected: the workflow can't follow references |
 | ambiguous-1/2 | traditional answer | answered instead of asking which document | expected: the workflow can't ask |
 

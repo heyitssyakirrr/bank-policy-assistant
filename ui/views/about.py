@@ -53,7 +53,7 @@ st.markdown(
 
 st.subheader("Known limits")
 st.markdown(
-    "- Agentic answers take longer (often 20 to 40 seconds) on the free model tier.\n"
+    "- Agentic answers take longer (a median of 7 seconds, against 4 for traditional).\n"
     "- The same question can be phrased slightly differently each time; the checks keep it grounded.\n"
     "- This is a demo on free tiers, so the number of questions per day is limited."
 )

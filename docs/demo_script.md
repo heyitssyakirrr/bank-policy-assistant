@@ -2,7 +2,7 @@
 
 About 10 minutes, on the live app (https://bnm-policy-assistant.streamlit.app/).
 Each step names what to click, what to say, and what the audience should see.
-Agentic answers take 25–40 s on the free tier: talk through the step timeline
+Agentic answers take about 5–20 s (median 7 s): talk through the step timeline
 while it fills.
 
 **Before starting (10 minutes early):**
@@ -45,8 +45,8 @@ sure the answer actually uses it."*
 ## 3. The same question both ways (2 min, Compare modes)
 Click **"What does e-KYC paragraph 8.10 require?"** in the examples, then **Compare**.
 
-- Traditional: about 5–7 s, 1 LLM call, only 8.10 (MAY).
-- Agentic: 4–5 LLM calls, 25–40 s, both 8.4 and 8.10.
+- Traditional: about 4 s, 1 LLM call, only 8.10 (MAY).
+- Agentic: 4–5 LLM calls, about 8 s, both 8.4 and 8.10.
 
 Point at the table underneath: *"Same search engine, same generator, same
 verifier. The difference comes from the agent's decisions, including the extra
@@ -77,8 +77,9 @@ audit tables."*
 ## 7. How we know it works (2 min, Evaluation)
 Open the **Evaluation** page:
 - 40 questions in 8 categories, both modes: agentic 100% outcome accuracy vs
-  95%, citation recall 91% vs 80%;
-- the cost: 2.85 vs 1.05 LLM calls, about 25 s vs 4 s;
+  95%, citation recall 91% vs 82%;
+- the cost: 2.95 vs 1.05 LLM calls, about 7 s vs 4 s (on the Gemini free tier
+  the agent took 25 s);
 - the retrieval chart: on this small set the stages add little on average (MRR
   ends where dense search starts). Say why they stay: exact codes like 14A.9.6
   that meaning search misses, and paraphrases that keyword search misses;
@@ -97,8 +98,8 @@ without any API key.
 | Why a bounded agent, not ReAct? | A bank needs predictable, auditable behaviour: the model decides at fixed points, code enforces every limit. | `app/agent/budget.py`, `routing.py` |
 | How are citations verified? | The model cites labels (E1…); code checks each label exists, the quote is in the passage, a MUST doesn't rest only on G, and a referenced passage isn't left out. | `app/agent/verification.py` |
 | How do you measure quality? | A 40-question golden set, both modes, code metrics plus an LLM judge; small, so read it as direction. | [testing and evaluation](testing_and_evaluation.md) |
-| What does the agent cost? | About 2.7× the LLM calls and 6× the time of traditional. | [investigation §6](agentic_rag_investigation.md#6-what-we-measured) |
-| What fails today? | sector-4 (the planner narrowed the search), the FTFC good-practice boxes carrying S, a golden set not yet checked by a person, and a judge that wasn't cross-checked. | [README, known limits](../README.md#known-limits) |
+| What does the agent cost? | About 2.8× the LLM calls and 1.8× the time of traditional (7.0 s vs 3.8 s median). | [investigation §6](agentic_rag_investigation.md#6-what-we-measured) |
+| What fails today? | followup-2 and sector-3 (the planner steered the search away from a paragraph it needed), the FTFC good-practice boxes carrying S, a golden set not yet checked by a person, and a judge that wasn't cross-checked. | [README, known limits](../README.md#known-limits) |
 
 ## If something goes wrong
 - **Slow or "high demand" errors:** a model is overloaded; the app falls back to

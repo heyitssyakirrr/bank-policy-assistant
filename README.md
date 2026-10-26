@@ -38,29 +38,46 @@ The reviewer finds the reference; the verifier makes sure the answer uses it.
 
 ## Results (full evaluation: 40 questions × 2 modes)
 
-Measured on 26 Oct with the Gemini models (planner and reviewer
-`gemini-3.1-flash-lite`, generator `gemini-3.5-flash-lite`), before the switch
-to DeepSeek; a re-run on DeepSeek replaces these numbers.
+Run `20261026-1728-full`: planner, reviewer and generator on DeepSeek
+`deepseek-flash`, judge on Gemini `gemini-3.1-flash-lite` (a different model
+family), 0 errors, 0 answers that needed a fallback model.
 
 | | Traditional | Agentic |
 |---|---|---|
 | Outcome accuracy (answered, refused or asked to clarify, as expected) | 95% | **100%** |
-| Citation recall (gold paragraphs the answer cited) | 80% | **91%** |
-| Evidence recall (gold paragraphs retrieved)¹ | 82% | **92%** |
-| Faithfulness (statements supported by their citation; LLM judge) | 98% | 99% |
+| Citation recall (gold paragraphs the answer cited) | 82% | **91%** |
+| Evidence recall (gold paragraphs retrieved)¹ | 82% | **91%** |
+| Faithfulness (statements supported by their citation; LLM judge) | **99%** | 97% |
 | Verifier pass rate (answers passing every code check) | 100% | 100% |
-| LLM calls per question | **1.05** | 2.85 |
-| Latency p50 (median) | **4.4 s** | 25.1 s |
+| LLM calls per question | **1.05** | 2.95 |
+| Latency p50 / p95 | **3.8 s / 5.8 s** | 7.0 s / 18.4 s |
 
 ¹ Agentic counts every passage it gathered over several searches; traditional
 counts its top 5.
 
-Agentic is ahead on cross-references, comparisons, follow-ups and ambiguous
-questions (it can ask which document; traditional can't). The categories are
-small (2–10 questions each), so read the gaps as direction, not exact effect
-sizes. It costs about 2.7× the calls and 6× the time, so it is not always the
-better choice: see [the investigation](docs/agentic_rag_investigation.md) and
+Agentic is ahead on cross-references (citation recall 100% vs 62%),
+comparisons (90% vs 62%) and ambiguous questions (it asks which document;
+traditional can't). The categories are small (2–10 questions each), so read the
+gaps as direction, not exact effect sizes. It costs about 2.8× the calls and
+1.8× the time, so it is not always the better choice: see
+[the investigation](docs/agentic_rag_investigation.md) and
 [the evaluation](docs/testing_and_evaluation.md), including the failures.
+
+**The same evaluation on the Gemini free tier** (run `20261026-0338-full`,
+before the switch: planner and reviewer `gemini-3.1-flash-lite`, generator
+`gemini-3.5-flash-lite`):
+
+| Agentic mode | Gemini Flash-Lite | DeepSeek Flash |
+|---|---|---|
+| Outcome accuracy | 100% | 100% |
+| Citation recall | 91% | 91% |
+| Faithfulness | 99% | 97% |
+| Latency p50 / p95 | 25.1 s / 69.9 s | **7.0 s / 18.4 s** |
+| LLM calls per question | 2.85 | 2.95 |
+
+Quality is about the same; DeepSeek is about 3.5× faster, mainly because the
+Gemini free tier kept answering "503 high demand" and every step waited for
+retries and the fallback.
 
 ## How it works
 
@@ -186,8 +203,11 @@ python -m evals.run --full                # the golden set, both modes, judged
   69.9 s on the Gemini free tier, where `gemini-3.1-flash-lite` often answered
   "503 high demand" (the app falls back and skips an overloaded model for 120 s).
   This is why the main models moved to paid DeepSeek.
-- **The planner can search too narrowly:** a money-changer question was treated
-  as an e-KYC question and missed the AML money-services rule (item sector-4).
+- **The agent can miss a paragraph it needed:** on Gemini, a money-changer
+  question was narrowed to e-KYC and missed the AML money-services rule
+  (sector-4); on DeepSeek, a follow-up ("how often must that be reviewed?") was
+  rewritten around e-KYC 8.22 and never found 8.24, the 3-year rule
+  (followup-2).
 - **Two AML paragraph boundaries are wrong** (14A.14.1 and 14B.16.2 merged into a
   neighbour; the text is kept).
 - Answers are based on the three policy documents only. Not legal advice.

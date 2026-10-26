@@ -66,7 +66,7 @@ new work, not a call already running). The traditional mode is a pure workflow.
 
 | | Traditional RAG | Agentic RAG |
 |---|---|---|
-| LLM calls | 1 (2 with a regeneration; 1.05 on average here) | several (2.85 on average here, at most 5) |
+| LLM calls | 1 (2 with a regeneration; 1.05 on average here) | several (2.95 on average here, at most 5) |
 | Latency | low | higher, and it varies with the path |
 | Predictability | same path every time | the path varies, so it must be bounded and traced |
 | Failure modes | misses what one search can't find | wrong routing, over-filtered searches, loops (bounded here) |
@@ -80,8 +80,8 @@ retrieve. It still depends on a good search engine. Both modes here share one.
 
 - **Simple, single-topic questions.** Both modes found the answer to every
   direct lookup in our set (4 questions); the agent only added time and cost.
-- **Strict latency or cost budgets.** Here the agent took a median 25 s versus
-  4 s, at about 2.7× the calls.
+- **Strict latency or cost budgets.** Here the agent took a median 7.0 s versus
+  3.8 s, at about 2.8× the calls (on the Gemini free tier: 25 s versus 4 s).
 - **When a deterministic path is required,** for example a regulated decision
   that must follow the same steps every time and be explained step by step.
   Then prefer a workflow, or bound the agent tightly and log every decision, as
@@ -94,17 +94,19 @@ retrieve. It still depends on a good search engine. Both modes here share one.
 ## 6. What we measured
 
 The same 40-question golden set (8 categories), both modes, the same search
-engine, generator and verifier. Full report:
-`evals/results/20261026-0338-full/report.md` (and the app's Evaluation page).
+engine, generator and verifier. The planner, reviewer and generator run on
+DeepSeek `deepseek-flash`; the judge is Gemini `gemini-3.1-flash-lite`. Full
+report: `evals/results/20261026-1728-full/report.md` (and the app's
+Evaluation page). No answer needed a fallback model.
 
 | | Traditional | Agentic |
 |---|---|---|
 | Outcome accuracy (answer / refuse / clarify, as expected) | 95% | **100%** |
-| Citation recall (gold paragraphs cited) | 80% | **91%** |
-| Evidence recall (gold paragraphs retrieved)¹ | 82% | **92%** |
-| Faithfulness (statements supported by their citation; LLM judge) | 98% | 99% |
-| LLM calls per question | **1.05** | 2.85 |
-| Latency p50 / p95 | **4.4 s / 11.0 s** | 25.1 s / 69.9 s |
+| Citation recall (gold paragraphs cited) | 82% | **91%** |
+| Evidence recall (gold paragraphs retrieved)¹ | 82% | **91%** |
+| Faithfulness (statements supported by their citation; LLM judge) | **99%** | 97% |
+| LLM calls per question | **1.05** | 2.95 |
+| Latency p50 / p95 | **3.8 s / 5.8 s** | 7.0 s / 18.4 s |
 
 ¹ Agentic counts every passage it gathered over several searches; traditional
 counts its top 5. p50 is the median; p95 means 95% of questions were faster.
@@ -114,29 +116,51 @@ By category (citation recall unless stated):
 | Category | Traditional | Agentic | What made the difference |
 |---|---|---|---|
 | Cross-reference | 62% | **100%** | the reviewer followed "as required under paragraph 8.4" and fetched 8.4; the verifier's cross-reference check made the generator use it |
-| Comparison | 56% | **83%** | decomposition: one filtered search per document |
-| Follow-up | 75% | **100%** | query rewriting from the conversation, sector switched |
+| Comparison | 62% | **90%** | decomposition: one filtered search per document |
+| Paraphrased | 90% | **97%** | small difference |
 | Ambiguous (outcome) | 0% | **100%** | only the agent can ask which document |
 | Out of scope (outcome) | 100% | 100% | traditional refused after searching; agentic before searching, in 1 call |
 | Direct lookup | 100% | 100% | no difference: an agent isn't needed |
-| Paraphrased | 87% | 92% | small difference |
+| Follow-up | 75% | 75% | the rewriting works (the takaful follow-up switches to 14B), but one rewrite lost the paragraph it needed (below) |
 | Sector-specific | **100%** | 75% | one agentic miss (below) |
 
 The categories are small (2–10 questions; in a 4-question category one question
 is 25 points), and the cross-reference questions name the reference ("…including
 the rule it refers to"). Read the gaps as direction, not precise effect sizes.
-The judge (`gemini-3.1-flash-lite`) is the same model as the reviewer, so the
-family that gathers the evidence also scores the answers; a cross-check by a
-second model was planned but stopped after 3 calls on 504 errors.
+The judge (Gemini) is a different model family from the planner, reviewer and
+generator (DeepSeek); a cross-check by a second judge (`gemini-3.8-flash`) was
+planned but stopped after 3 calls on 504 errors.
 
-**Where the agent was worse.** For "How may a money changer verify a
-customer's identity remotely?" the planner rewrote it as an e-KYC question
-("…remotely using e-KYC?") and never retrieved AML 14C.16.12, the
-money-services rule on video calls. The
-answer was correct but incomplete. This is the agent's typical failure: a
-planning decision that narrows the search too far. Traditional searched all
-documents and found it. A known limit: the next prompt revision tells the
-planner not to narrow a sector-rule question to one document.
+**Where the agent was worse.** Its typical failure is a planning decision
+that steers the search away from a paragraph it needed:
+- *followup-2*: after a question about e-KYC 8.22, "how often must that be
+  reviewed?" was rewritten as a question about 8.22 itself, and the search never
+  found 8.24, the paragraph with the 3-year rule;
+- *sector-3*: for "Can a non-bank e-money issuer establish non-face-to-face
+  business relationships?" it found the e-money requirements (AML 14D.16.2, .8,
+  .10–.12) but not 14D.16.1, the paragraph that says it may;
+- on the Gemini models, *sector-4* was narrowed to e-KYC and missed the AML
+  money-services rule; DeepSeek found it.
+
+The answers were correct but incomplete. Traditional searched with the
+question as typed and found 14D.16.1. A known limit for the next prompt
+revision.
+
+**Gemini free tier vs DeepSeek** (agentic mode, the same golden set; the Gemini
+run is `20261026-0338-full`):
+
+| | Gemini Flash-Lite | DeepSeek Flash |
+|---|---|---|
+| Outcome accuracy | 100% | 100% |
+| Citation recall | 91% | 91% |
+| Faithfulness | 99% | 97% |
+| Latency p50 / p95 | 25.1 s / 69.9 s | **7.0 s / 18.4 s** |
+| LLM calls per question | 2.85 | 2.95 |
+
+The decision-making transferred to a different model family without changing
+the prompts, at about the same quality and about 3.5× the speed. The speed came
+mostly from the Gemini free tier's "503 high demand" errors, which made every
+step wait for retries and the fallback.
 
 **Conclusion.** On this corpus the agent is worth its cost for the question
 types that need it (cross-references, comparisons, follow-ups, ambiguity and
